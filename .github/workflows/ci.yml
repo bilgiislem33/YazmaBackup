@@ -1,0 +1,85 @@
+name: YazmaBackup CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yazmabackup-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-quality-gate:
+    name: Windows quality gate
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: src/YazmaBackup.Frontend/package-lock.json
+
+      - name: Frontend install
+        working-directory: src/YazmaBackup.Frontend
+        run: npm ci
+
+      - name: Frontend production audit
+        working-directory: src/YazmaBackup.Frontend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Frontend typecheck
+        working-directory: src/YazmaBackup.Frontend
+        run: npm run typecheck
+
+      - name: Frontend production build
+        working-directory: src/YazmaBackup.Frontend
+        run: npm run build
+
+      - name: Restore .NET
+        run: dotnet restore
+
+      - name: Build .NET warnings as errors
+        run: dotnet build -c Release --no-restore -warnaserror
+
+      - name: Run automated tests
+        shell: pwsh
+        run: |
+          $projects = Get-ChildItem -Recurse -Filter '*Tests.csproj' | Select-Object -ExpandProperty FullName
+          if (-not $projects) {
+            throw 'No automated *Tests.csproj project exists. R28 CI fails closed.'
+          }
+          New-Item -ItemType Directory -Force -Path artifacts/test-results | Out-Null
+          foreach ($project in $projects) {
+            dotnet test $project -c Release --no-restore --logger "trx;LogFileName=$([IO.Path]::GetFileNameWithoutExtension($project)).trx" --results-directory artifacts/test-results
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Enterprise SelfTest
+        run: dotnet run --project src/YazmaBackup.SelfTest -c Release --no-build
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results
+          if-no-files-found: warn
+          retention-days: 14
