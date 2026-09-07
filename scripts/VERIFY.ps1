@@ -107,7 +107,43 @@ try {
     }
     $telemetryRegistry=Get-Content .\src\YazmaBackup.ControlPlane\TransferTelemetryRegistry.cs -Raw
     foreach($feature in @('MaxHistoryBuckets','_aggregateHistory','TransferTelemetrySeriesPointDto','SafeSum')){if($telemetryRegistry -notmatch [Regex]::Escape($feature)){throw "Bounded live telemetry invariant eksik: $feature"}}
-    if($program -notmatch "script-src 'self'" -or $program -notmatch "frame-ancestors 'none'"){throw 'CSP header eksik.'}
+    $cspPath=Join-Path $root 'src\YazmaBackup.ControlPlane\FrontendContentSecurityPolicy.cs'
+    if(-not(Test-Path -LiteralPath $cspPath -PathType Leaf)){throw 'Frontend CSP builder eksik.'}
+    $csp=Get-Content -Raw -Encoding UTF8 -LiteralPath $cspPath
+
+    if(-not $program.Contains('FrontendContentSecurityPolicy.Build(app.Environment.WebRootPath)')){
+        throw 'Program.cs frontend CSP builder kullanmiyor.'
+    }
+
+    foreach($required in @(
+        "script-src",
+        "'self'",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "SHA256.HashData",
+        "'sha256-"
+    )){
+        if(-not $csp.Contains($required)){
+            throw "Frontend CSP invarianti eksik: $required"
+        }
+    }
+
+    if($csp.Contains("'unsafe-inline'") -or $csp.Contains("'unsafe-eval'")){
+        throw 'Frontend CSP unsafe-inline/unsafe-eval ile gevsetilmis.'
+    }
+
+    foreach($required in @(
+        'index.html',
+        '<script',
+        'src',
+        'Convert.ToBase64String'
+    )){
+        if(-not $csp.Contains($required)){
+            throw "Next inline-script CSP hash akisi eksik: $required"
+        }
+    }
 
     Write-Host '[10/23] PostgreSQL migration zinciri / drift'
     $migrations=@(Get-ChildItem .\database\postgresql -File -Filter '*.sql' | Sort-Object Name)

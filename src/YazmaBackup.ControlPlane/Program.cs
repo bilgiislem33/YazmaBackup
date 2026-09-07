@@ -1,4 +1,4 @@
-using System.Security.Cryptography.X509Certificates;
+﻿using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -184,7 +184,7 @@ app.Use(async (context, next) =>
     });
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
-    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+    context.Response.Headers["Content-Security-Policy"] = FrontendContentSecurityPolicy.Build(app.Environment.WebRootPath);
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), usb=()";
     context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
