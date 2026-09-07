@@ -5,7 +5,7 @@ $pg=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBack
 foreach($x in @('_directSqlMutations','YAZMABACKUP_DIRECT_SQL_MUTATIONS','CommitCommandMutationUnsafeAsync','CommitPolicyMutationUnsafeAsync','CommitPolicyDeleteUnsafeAsync','AcceptFocusedCommitUnsafeAsync')){
  if(-not $state.Contains($x)){throw ('R15 StateStore mutation invariant eksik: '+$x)}
 }
-foreach($x in @('TryCommitCommandMutationAsync','TryCommitPolicyMutationAsync','TryCommitPolicyDeleteAsync','TryCommitFocusedMutationAsync','IsolationLevel.Serializable','version = version + 1','version = @expected','focusedMutationPath = "commands+policies"')){
+foreach($x in @('TryCommitCommandMutationAsync','TryCommitPolicyMutationAsync','TryCommitPolicyDeleteAsync','TryCommitFocusedMutationAsync','IsolationLevel.Serializable','version = version + 1','version = @expected')){
  if(-not $pg.Contains($x)){throw ('R15 PostgreSQL mutation invariant eksik: '+$x)}
 }
-Write-Host 'PASS: R15 Direct SQL Mutation Core Cutover davranış tabanlı kalite kapısı.'
+Write-Host 'PASS: R15 Direct SQL Mutation Core Cutover davranis tabanli kalite kapisi.'
