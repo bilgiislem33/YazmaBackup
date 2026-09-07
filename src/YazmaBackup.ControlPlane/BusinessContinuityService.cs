@@ -46,14 +46,14 @@ public sealed class BusinessContinuityService
             var fabricPlans=fabric.Plans.Where(fp=>related.Any(r=>r.PlanId==fp.PlanId)).ToArray();
             var covered=ids.Count(id=>related.Any(r=>r.PolicyIds.Contains(id)));
             var missing=Math.Max(0,ids.Count-covered);
-            var score=fabricPlans.Length==0?0:(int)Math.Round(fabricPlans.Average(x=>x.ReadinessScore));
-            if(missing>0) score=Math.Max(0,score-Math.Min(40,missing*10));
+            var readinessScore=fabricPlans.Length==0?0:(int)Math.Round(fabricPlans.Average(x=>x.ReadinessScore));
+            if(missing>0) readinessScore=Math.Max(0,readinessScore-Math.Min(40,missing*10));
             var criticality=InferCriticality(group.Key,group.Count(),related);
             var priority=criticality=="critical"?1:criticality=="high"?2:3;
             var rto=related.Length==0?0:related.Min(x=>x.RtoTargetMinutes);
             services.Add(new(
                 Slug(group.Key),group.Key,criticality,priority,ids.Count,related.Length,rto,
-                score,score>=90?"ready":score>=70?"attention":"not-ready",missing,
+                readinessScore,readinessScore>=90?"ready":readinessScore>=70?"attention":"not-ready",missing,
                 Array.Empty<string>(),
                 related.Length==0?"Recovery Plan kapsamı yok; önce DR planı tanımlanmalı.":
                 missing>0?"Bazı backup politikaları Recovery Plan dışında; kapsam tamamlanmalı.":

@@ -1029,7 +1029,7 @@ securityAdmin.MapPost("/settings/import", async (SettingsImportRequest request, 
 {
     try { return Results.Ok(await transfer.ImportAsync(request.Passphrase, request.BundleBase64, ct).ConfigureAwait(false)); }
     catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
-    catch (UnauthorizedAccessException ex) { return Results.Unauthorized(); }
+    catch (UnauthorizedAccessException) { return Results.Unauthorized(); }
     catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
 });
 
@@ -1522,7 +1522,7 @@ readAdmin.MapGet("/autonomous-reliability", async (IControlPlaneStore store, Can
         {
             autonomousDiagnosis = true,
             silentMutation = false,
-            allowlistedMutations = new[] { "reset-repository-circuit", "cleanup-stale-restore-temp" },
+            allowlistedMutations = AutonomousMutationAllowlist.Values,
             approvalRequiredForMutation = true
         }
     });
@@ -2278,8 +2278,3 @@ static ProtectionTelemetryDto? SanitizeProtection(ProtectionTelemetryDto? protec
     if (reason?.Length > 256) reason = reason[..256];
     return new ProtectionTelemetryDto(status, reason, protection.TriggeredAtUtc, protection.IncidentId);
 }
-
-public sealed record UpsertBusinessServiceDependencyRequest(string ServiceId, string DependsOnServiceId, string DependencyType, bool Required);
-
-public sealed record CreateDrSessionRequest(string Name);
-public sealed record VerifyDrStepRequest(string VerificationNote);

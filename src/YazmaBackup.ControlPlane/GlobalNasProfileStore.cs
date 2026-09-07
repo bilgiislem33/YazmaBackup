@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace YazmaBackup.ControlPlane;
@@ -19,7 +20,7 @@ public sealed record GlobalNasProfileSummary(
     DateTimeOffset UpdatedAtUtc,
     bool PasswordConfigured);
 
-public sealed class GlobalNasProfileStore
+public sealed class GlobalNasProfileStore : IDisposable
 {
     private readonly string _path;
     private readonly IDataProtector _protector;
@@ -82,6 +83,8 @@ public sealed class GlobalNasProfileStore
         }
         finally { _gate.Release(); }
     }
+
+    public void Dispose() => _gate.Dispose();
 
     public static GlobalNasProfileSummary ToSummary(GlobalNasProfile profile) =>
         new(profile.RepositoryId, profile.RepositoryRoot, profile.Username, profile.Version, profile.UpdatedAtUtc, !string.IsNullOrEmpty(profile.Password));

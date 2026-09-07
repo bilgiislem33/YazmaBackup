@@ -10,6 +10,7 @@ public sealed class PostgreSqlStateEngine
 {
     private readonly string _connectionString;
     private readonly string _clusterId;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public PostgreSqlStateEngine(string connectionString, string clusterId)
     {
@@ -62,7 +63,7 @@ public sealed class PostgreSqlStateEngine
                    state_json = CAST(@json AS jsonb),
                    updated_at_utc = now()
              WHERE cluster_id = @cluster AND version = @expected
-         RETURNING version, state_json::text
+             RETURNING version, state_json::text
             """, connection, tx);
         command.Parameters.AddWithValue("cluster", _clusterId);
         command.Parameters.AddWithValue("expected", expectedVersion);
@@ -309,7 +310,7 @@ public sealed class PostgreSqlStateEngine
         AgentCommand command,
         CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var json = JsonSerializer.Serialize(command, JsonOptions);
         await using var upsert = new NpgsqlCommand("""
             INSERT INTO yb_commands(cluster_id, command_id, agent_id, command_type, created_at_utc, claimed_at_utc, lease_id, lease_expires_at_utc, last_lease_renewal_utc, completed_at_utc, succeeded, attempt_count, idempotency_key, error, payload)
             VALUES (@cluster,@command,@agent,@type,@created,@claimed,@leaseId,@leaseExpires,@leaseRenewal,@completed,@succeeded,@attempts,@idempotency,@error,CAST(@payload AS jsonb))
@@ -340,26 +341,26 @@ public sealed class PostgreSqlStateEngine
 
     private static string SetCommandInStateJson(string stateJson, AgentCommand command)
     {
-        var state = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(stateJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        var state = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(stateJson, JsonOptions)
             ?? throw new InvalidDataException("State JSON is invalid.");
         var commands = state.TryGetValue("commands", out var existing) && existing.ValueKind == JsonValueKind.Object
-            ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(existing.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web))!
+            ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(existing.GetRawText(), JsonOptions)!
             : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
-        commands[command.CommandId.ToString()] = JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        state["commands"] = JsonSerializer.SerializeToElement(commands, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        return JsonSerializer.Serialize(state, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        commands[command.CommandId.ToString()] = JsonSerializer.SerializeToElement(command, JsonOptions);
+        state["commands"] = JsonSerializer.SerializeToElement(commands, JsonOptions);
+        return JsonSerializer.Serialize(state, JsonOptions);
     }
 
     private static string RemoveCommandFromStateJson(string stateJson, string commandId)
     {
-        var state = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(stateJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        var state = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(stateJson, JsonOptions)
             ?? throw new InvalidDataException("State JSON is invalid.");
         if (!state.TryGetValue("commands", out var existing) || existing.ValueKind != JsonValueKind.Object) return stateJson;
-        var commands = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(existing.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        var commands = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(existing.GetRawText(), JsonOptions)
             ?? new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
         commands.Remove(commandId);
-        state["commands"] = JsonSerializer.SerializeToElement(commands, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        return JsonSerializer.Serialize(state, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        state["commands"] = JsonSerializer.SerializeToElement(commands, JsonOptions);
+        return JsonSerializer.Serialize(state, JsonOptions);
     }
 
 
@@ -418,7 +419,7 @@ public sealed class PostgreSqlStateEngine
                    state_json = CAST(@json AS jsonb),
                    updated_at_utc = now()
              WHERE cluster_id = @cluster AND version = @expected
-         RETURNING version, state_json::text
+             RETURNING version, state_json::text
             """, connection, tx);
         stateCommand.Parameters.AddWithValue("cluster", _clusterId);
         stateCommand.Parameters.AddWithValue("expected", expectedVersion);
@@ -438,7 +439,7 @@ public sealed class PostgreSqlStateEngine
 
         // Completion can update Command + RepositoryHealth + RecoveryRuns + Alarms and other resilience state.
         // Project the authoritative post-resilience document inside the SAME transaction.
-        await ProjectNormalizedStateAsync(connection, tx, stateJson, ct).ConfigureAwait(false);
+        await SyncNormalizedProjectionAsync(connection, tx, stateJson, ct).ConfigureAwait(false);
 
         await using (var completionFence = new NpgsqlCommand("""
             UPDATE yb_commands
@@ -463,7 +464,7 @@ public sealed class PostgreSqlStateEngine
         AgentCommand commandRecord,
         CancellationToken ct)
     {
-        var entityJson = JsonSerializer.Serialize(commandRecord, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var entityJson = JsonSerializer.Serialize(commandRecord, JsonOptions);
         return await TryCommitFocusedMutationAsync(
             expectedVersion,
             stateJson,
@@ -492,7 +493,7 @@ public sealed class PostgreSqlStateEngine
         BackupPolicyRecord policy,
         CancellationToken ct)
     {
-        var entityJson = JsonSerializer.Serialize(policy, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var entityJson = JsonSerializer.Serialize(policy, JsonOptions);
         return await TryCommitFocusedMutationAsync(
             expectedVersion,
             stateJson,
@@ -545,7 +546,7 @@ public sealed class PostgreSqlStateEngine
                    state_json = CAST(@json AS jsonb),
                    updated_at_utc = now()
              WHERE cluster_id = @cluster AND version = @expected
-         RETURNING version, state_json::text
+             RETURNING version, state_json::text
             """, connection, tx);
         stateCommand.Parameters.AddWithValue("cluster", _clusterId);
         stateCommand.Parameters.AddWithValue("expected", expectedVersion);
@@ -687,7 +688,7 @@ public sealed class PostgreSqlStateEngine
     }
 
     private static T DeserializePayload<T>(string json) =>
-        JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        JsonSerializer.Deserialize<T>(json, JsonOptions)
         ?? throw new InvalidDataException($"Normalized PostgreSQL payload could not be deserialized as {typeof(T).Name}.");
 
     public object GetStatus()

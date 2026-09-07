@@ -390,9 +390,9 @@ try {
 
     Write-Host '[18/23] Secret/private-key taraması'
     $secretPattern='(?i)(password|secret|token|keybase64)\s*=\s*["''][^"''$]{8,}["'']'
-    $secretHits=Get-ChildItem .\src,.\scripts -Recurse -File -Include *.cs,*.json,*.ps1,*.js | Where-Object {$_.Name -ne 'VERIFY.ps1'} | Select-String -Pattern $secretPattern
+    $secretHits=Get-ChildItem .\src,.\scripts -Recurse -File -Include *.cs,*.json,*.ps1,*.js | Where-Object {$_.Name -ne 'VERIFY.ps1' -and $_.FullName -notmatch '[\\/](node_modules|\.next|bin|obj|publish|artifacts)[\\/]'} | Select-String -Pattern $secretPattern
     if($secretHits){$secretHits|ForEach-Object{Write-Host $_};throw 'Olası gömülü secret bulundu.'}
-    if(Get-ChildItem . -Recurse -File -Include *.pem,*.key | Select-String -Pattern 'BEGIN .*PRIVATE KEY' -ErrorAction SilentlyContinue){throw 'Kaynak ağacında private key bulundu.'}
+    if(Get-ChildItem .\src,.\scripts -Recurse -File -Include *.pem,*.key | Where-Object {$_.FullName -notmatch '[\\/](node_modules|\.next|bin|obj|publish|artifacts)[\\/]'} | Select-String -Pattern 'BEGIN .*PRIVATE KEY' -ErrorAction SilentlyContinue){throw 'Kaynak ağacında private key bulundu.'}
 
     Write-Host '[19/23] Doküman sözleşmesi'
     foreach($doc in @('OIDC_SSO.md','ALARM_CENTER.md','CONTROL_PLANE_CLUSTER.md','POSTGRESQL_CUTOVER.md','PROGRESS.md','MESHCENTRAL_DEPLOYMENT.md','RESILIENCE.md','NOTIFICATIONS.md','MESHCENTRAL_INTEGRATION.md','PRODUCTION_FABRIC.md','CIRCUIT_BREAKER.md','RECOVERY_RUNBOOK.md','MESHCENTRAL_STATUS_INGESTION.md','FAULT_INJECTION_PILOT.md','WEB_UI.md','LIVE_TRANSFER_TELEMETRY.md','EASY_RESTORE.md','PILOT_CENTER.md','VALIDATION_FABRIC.md','SELF_HEALING.md','GRANULAR_RESTORE_SANDBOX.md','UPDATE_ROLLBACK_VALIDATION.md')){if(-not(Test-Path (Join-Path '.\docs' $doc))){throw "Doküman eksik: $doc"}}

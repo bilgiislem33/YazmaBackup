@@ -85,7 +85,7 @@ internal sealed record AutonomousOrchestrationState(
     IReadOnlyList<AutonomousRemediationRun> Remediations,
     IReadOnlyList<CanaryRolloutRun> Rollouts);
 
-public sealed class AutonomousOrchestrationStore
+public sealed class AutonomousOrchestrationStore : IDisposable
 {
     private readonly string _path;
     private readonly IDataProtector _protector;
@@ -212,6 +212,8 @@ public sealed class AutonomousOrchestrationStore
         await File.WriteAllTextAsync(temp, protectedText, ct).ConfigureAwait(false);
         File.Move(temp, _path, true);
     }
+
+    public void Dispose() => _gate.Dispose();
 }
 
 public sealed partial class AutonomousRemediationOrchestratorService(
