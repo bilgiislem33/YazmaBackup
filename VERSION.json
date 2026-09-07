@@ -1,0 +1,12 @@
+{
+  "product": "YazmaBackup",
+  "version": "1.2.0",
+  "channel": "meshcentral-fleet-connector",
+  "targetFramework": "net10.0",
+  "language": "C# 14",
+  "productionReady": false,
+  "stateSchema": 11,
+  "repositorySchema": 3,
+  "notes": "Full cumulative package. Removes obsolete dpapi-local-machine literal from R10.5 VERIFY and validates current HA runtime/program behavior. Agent unchanged.",
+  "releaseRevision": "r27.3.9-r10.5-current-ha-behavior-gate"
+}

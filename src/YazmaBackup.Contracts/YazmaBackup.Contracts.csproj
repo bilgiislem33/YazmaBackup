@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\YazmaBackup.Domain\YazmaBackup.Domain.csproj" />
+  </ItemGroup>
+</Project>

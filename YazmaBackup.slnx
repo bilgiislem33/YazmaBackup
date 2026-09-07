@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="src/YazmaBackup.Domain/YazmaBackup.Domain.csproj" />
+  <Project Path="src/YazmaBackup.Contracts/YazmaBackup.Contracts.csproj" />
+  <Project Path="src/YazmaBackup.Application/YazmaBackup.Application.csproj" />
+  <Project Path="src/YazmaBackup.Infrastructure/YazmaBackup.Infrastructure.csproj" />
+  <Project Path="src/YazmaBackup.ControlPlane/YazmaBackup.ControlPlane.csproj" />
+  <Project Path="src/YazmaBackup.Agent/YazmaBackup.Agent.csproj" />
+  <Project Path="src/YazmaBackup.SelfTest/YazmaBackup.SelfTest.csproj" />
+  <Project Path="src/YazmaBackup.SigningTool/YazmaBackup.SigningTool.csproj" />
+</Solution>

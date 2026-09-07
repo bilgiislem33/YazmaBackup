@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\YazmaBackup.Contracts\YazmaBackup.Contracts.csproj" />
+    <ProjectReference Include="..\YazmaBackup.Domain\YazmaBackup.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="tools\meshctrl-bridge.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <YazmaBackupFrontendRoot>$(MSBuildProjectDirectory)\..\YazmaBackup.Frontend</YazmaBackupFrontendRoot>
+    <YazmaBackupFrontendOut>$(YazmaBackupFrontendRoot)\out</YazmaBackupFrontendOut>
+  </PropertyGroup>
+
+  <Target Name="BuildProductionReactFrontend" BeforeTargets="ComputeFilesToPublish">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\BUILD_FRONTEND.ps1&quot;" />
+    <Error Condition="!Exists('$(YazmaBackupFrontendOut)\index.html')" Text="R26 React production export missing." />
+    <ItemGroup>
+      <YazmaBackupFrontendFiles Include="$(YazmaBackupFrontendOut)\**\*" />
+      <ResolvedFileToPublish Include="@(YazmaBackupFrontendFiles)">
+        <RelativePath>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
+</Project>

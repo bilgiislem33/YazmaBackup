@@ -1,0 +1,10 @@
+{
+  "name": "yazmabackup-controlplane-ui",
+  "private": true,
+  "scripts": {
+    "build:css": "node build-tailwind.mjs"
+  },
+  "devDependencies": {
+    "tailwindcss": "4.1.10"
+  }
+}

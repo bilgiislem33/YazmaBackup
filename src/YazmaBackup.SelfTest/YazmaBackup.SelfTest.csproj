@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\YazmaBackup.Application\YazmaBackup.Application.csproj" />
+    <ProjectReference Include="..\YazmaBackup.Infrastructure\YazmaBackup.Infrastructure.csproj" />
+    <ProjectReference Include="..\YazmaBackup.ControlPlane\YazmaBackup.ControlPlane.csproj" />
+    <ProjectReference Include="..\YazmaBackup.Contracts\YazmaBackup.Contracts.csproj" />
+    <ProjectReference Include="..\YazmaBackup.Domain\YazmaBackup.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\YazmaBackup.Contracts\YazmaBackup.Contracts.csproj" />
+    <ProjectReference Include="..\YazmaBackup.Application\YazmaBackup.Application.csproj" />
+    <ProjectReference Include="..\YazmaBackup.Infrastructure\YazmaBackup.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
