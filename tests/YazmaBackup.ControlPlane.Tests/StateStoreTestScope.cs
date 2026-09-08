@@ -20,6 +20,7 @@ internal sealed class StateStoreTestScope : IDisposable
         Set("YAZMABACKUP_HA_ROLE", "single");
         Set("YAZMABACKUP_DP_CERT_THUMBPRINT", null);
         Set("YAZMABACKUP_ENABLE_LEGACY_ADMIN_KEY", null);
+        Set(AutonomousExecutionPolicy.EnvironmentVariable, null);
     }
 
     internal StateStore OpenStore() => new(new TestEnvironment { ContentRootPath = Root });

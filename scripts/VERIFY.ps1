@@ -179,6 +179,9 @@ try {
     foreach($required in @('office-balanced','finance-critical','mobile-laptop','archive-steady','BuildSummaryAsync')){if($pilotService -notmatch [Regex]::Escape($required)){throw "Pilot template/readiness invariant eksik: $required"}}
     foreach($required in @('repository.write','repository.capacity','repository.key','source.ntfs','source.vss','FileOptions.WriteThrough')){if($pilotProbe -notmatch [Regex]::Escape($required)){throw "Agent pilot probe invariant eksik: $required"}}
     foreach($required in @('PilotReadinessProbePayload','PilotReadinessProbeResultDto','BulkApplyPolicyTemplateRequest')){if($pilotContracts -notmatch [Regex]::Escape($required)){throw "Pilot contract invariant eksik: $required"}}
+
+    Write-Host '[12a/23] Core Data Safety fail-safe invariantları'
+    & (Join-Path $root 'scripts\VERIFY_CORE_DATA_SAFETY.ps1')
     if($state -notmatch 'CreateBackupPoliciesAsync'){throw 'Atomic bulk policy store invariant eksik.'}
     if($program -notmatch 'apply-bulk' -or $program -notmatch 'pilot-readiness-probe'){throw 'Pilot API endpoint invariant eksik.'}
     if(-not $frontendConsole.Contains('PilotCenterPage') -or -not $frontendConsole.Contains('Kurulum & Pilot Merkezi') -or -not $frontendConsole.Contains('/api/v1/admin/pilot/readiness') -or -not $frontendConsole.Contains('/apply-bulk')){throw 'React Pilot Center UI eksik.'}

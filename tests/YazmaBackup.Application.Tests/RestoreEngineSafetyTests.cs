@@ -112,6 +112,64 @@ public sealed class RestoreEngineSafetyTests
         Assert.Equal(existing, await File.ReadAllBytesAsync(target));
     }
 
+    [Fact]
+    public async Task Existing_identical_file_is_counted_without_being_rewritten()
+    {
+        var bytes = "already-correct"u8.ToArray();
+        var repository = RepositoryWithSingleFile("document.bin", bytes);
+        using var destination = new TemporaryDirectory();
+        var target = Path.Combine(destination.Path, "document.bin");
+        await File.WriteAllBytesAsync(target, bytes);
+        var timestamp = DateTime.UtcNow.AddDays(-5);
+        File.SetLastWriteTimeUtc(target, timestamp);
+
+        var summary = await new RestoreEngine(repository)
+            .RestoreAsync("agent-1", "backup-1", destination.Path, false, CancellationToken.None);
+
+        Assert.Equal(0, summary.RestoredFiles);
+        Assert.Equal(1, summary.AlreadyPresentFiles);
+        Assert.Equal(timestamp, File.GetLastWriteTimeUtc(target));
+    }
+
+    [Fact]
+    public async Task Failed_overwrite_keeps_original_destination_bytes()
+    {
+        var expected = "backup-version"u8.ToArray();
+        var repository = RepositoryWithSingleFile("document.bin", expected);
+        repository.Chunks[Sha(expected)] = "corrupt"u8.ToArray();
+        using var destination = new TemporaryDirectory();
+        var target = Path.Combine(destination.Path, "document.bin");
+        var original = "local-version"u8.ToArray();
+        await File.WriteAllBytesAsync(target, original);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => new RestoreEngine(repository)
+            .RestoreAsync("agent-1", "backup-1", destination.Path, true, CancellationToken.None));
+
+        Assert.Equal(original, await File.ReadAllBytesAsync(target));
+        Assert.Empty(Directory.EnumerateFiles(destination.Path, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task Granular_selector_does_not_match_a_similar_prefix_folder()
+    {
+        var bytes = "selected"u8.ToArray();
+        var hash = Sha(bytes);
+        var selected = new BackupFileEntry("finance/report.bin", bytes.Length, DateTimeOffset.UtcNow, hash, [new(hash, bytes.Length)]);
+        var excluded = new BackupFileEntry("finance-old/report.bin", bytes.Length, DateTimeOffset.UtcNow, hash, [new(hash, bytes.Length)]);
+        var manifest = new BackupManifest("3", "backup-1", "agent-1", "C:\\source", DateTimeOffset.UtcNow,
+            [selected, excluded], bytes.Length * 2, bytes.Length, 1, 1, "test", false);
+        var repository = new MemoryRepository(manifest);
+        repository.Chunks[hash] = bytes;
+        using var destination = new TemporaryDirectory();
+
+        var summary = await new RestoreEngine(repository).RestoreSelectedAsync(
+            "agent-1", "backup-1", destination.Path, ["finance"], false, CancellationToken.None);
+
+        Assert.Equal(1, summary.RestoredFiles);
+        Assert.True(File.Exists(Path.Combine(destination.Path, "finance", "report.bin")));
+        Assert.False(File.Exists(Path.Combine(destination.Path, "finance-old", "report.bin")));
+    }
+
     private static MemoryRepository RepositoryWithSingleFile(string relativePath, byte[] bytes)
     {
         var hash = Sha(bytes);

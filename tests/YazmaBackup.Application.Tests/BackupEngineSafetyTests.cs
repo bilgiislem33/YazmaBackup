@@ -102,6 +102,38 @@ public sealed class BackupEngineSafetyTests
         Assert.Empty(repository.WrittenManifests);
     }
 
+    [Fact]
+    public async Task Chunk_write_failure_never_publishes_manifest_or_checkpoint()
+    {
+        using var source = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(source.Path, "critical.txt"), "must remain uncommitted");
+        var commits = 0;
+        var repository = new RecordingRepository { FailChunkWrite = true };
+        var engine = new BackupEngine(new WholeFileChunker(), repository, new PassThroughSnapshotProvider(),
+            new RecordingChangeTracker(() => commits++));
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            engine.BackupDirectoryAsync("agent-1", source.Path, CancellationToken.None));
+
+        Assert.Equal(0, commits);
+        Assert.Empty(repository.WrittenManifests);
+    }
+
+    [Fact]
+    public async Task Snapshot_failure_never_touches_repository()
+    {
+        using var source = new TemporaryDirectory();
+        await File.WriteAllTextAsync(Path.Combine(source.Path, "critical.txt"), "data");
+        var repository = new RecordingRepository();
+        var engine = new BackupEngine(new WholeFileChunker(), repository, new FailingSnapshotProvider());
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            engine.BackupDirectoryAsync("agent-1", source.Path, CancellationToken.None));
+
+        Assert.Empty(repository.StoredChunks);
+        Assert.Empty(repository.WrittenManifests);
+    }
+
     private sealed class WholeFileChunker : IChunker
     {
         public string ChunkerId => "test-whole-file";
@@ -126,6 +158,12 @@ public sealed class BackupEngineSafetyTests
         }
     }
 
+    private sealed class FailingSnapshotProvider : ISnapshotProvider
+    {
+        public Task<SnapshotHandle> CreateAsync(string sourcePath, CancellationToken cancellationToken) =>
+            Task.FromException<SnapshotHandle>(new IOException("Injected snapshot failure."));
+    }
+
     private sealed class RecordingChangeTracker(Action onCommit) : IIncrementalChangeTracker
     {
         public Task<IncrementalChangeSet> CaptureAsync(string sourceRoot, CancellationToken cancellationToken)
@@ -147,6 +185,7 @@ public sealed class BackupEngineSafetyTests
     private sealed class RecordingRepository : IBackupRepository
     {
         public bool FailManifestWrite { get; init; }
+        public bool FailChunkWrite { get; init; }
         public Dictionary<string, byte[]> StoredChunks { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<BackupManifest> WrittenManifests { get; } = [];
         public string? EncryptionKeyId => "test-key";
@@ -157,6 +196,7 @@ public sealed class BackupEngineSafetyTests
         public Task PutChunkAsync(string sha256, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (FailChunkWrite) throw new IOException("Injected chunk write failure.");
             StoredChunks[sha256] = data.ToArray();
             return Task.CompletedTask;
         }

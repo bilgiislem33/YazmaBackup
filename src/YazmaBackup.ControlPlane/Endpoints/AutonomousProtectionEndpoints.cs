@@ -12,6 +12,17 @@ internal static class AutonomousProtectionEndpoints
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private static RouteHandlerBuilder RequireAutonomousExecution(this RouteHandlerBuilder builder) =>
+        builder.AddEndpointFilter(async (context, next) =>
+        {
+            var policy = context.HttpContext.RequestServices.GetRequiredService<AutonomousExecutionPolicy>();
+            return policy.Enabled
+                ? await next(context).ConfigureAwait(false)
+                : Results.Json(
+                    new { error = $"Autonomous execution is disabled. Set {AutonomousExecutionPolicy.EnvironmentVariable}=true only after production validation." },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+        });
+
     internal static AdminEndpointGroups MapAutonomousProtectionEndpoints(this AdminEndpointGroups groups)
     {
         ArgumentNullException.ThrowIfNull(groups);
@@ -33,7 +44,7 @@ internal static class AutonomousProtectionEndpoints
             return run is null
                 ? Results.Conflict(new { error = "This case is not eligible for safe automatic diagnosis." })
                 : Results.Accepted($"/api/v1/admin/autonomous/remediations/{run.RunId}", run);
-        });
+        }).RequireAutonomousExecution();
 
         groups.Read.MapGet("/autonomous-reliability", async (IControlPlaneStore store, CancellationToken ct) =>
         {
@@ -167,7 +178,7 @@ internal static class AutonomousProtectionEndpoints
             if (!agents.Any(x => x.AgentId == request.AgentId)) return Results.NotFound(new { error = "Agent not found." });
             var run = await orchestration.CreateRemediationAsync(request, ct).ConfigureAwait(false);
             return Results.Created($"/api/v1/admin/autonomous/remediations/{run.RunId}", run);
-        });
+        }).RequireAutonomousExecution();
 
         groups.Security.MapPost("/autonomous/remediations/{runId:guid}/approve", async (Guid runId, HttpContext http, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
@@ -177,14 +188,14 @@ internal static class AutonomousProtectionEndpoints
                     ? x with { State = "approved", ApprovedAtUtc = DateTimeOffset.UtcNow, ApprovedBy = actor, Error = null }
                     : x, ct).ConfigureAwait(false);
             return run is null ? Results.NotFound() : run.State == "approved" ? Results.Ok(run) : Results.Conflict(new { error = "Remediation is not awaiting approval.", run.State });
-        });
+        }).RequireAutonomousExecution();
 
         groups.Security.MapPost("/autonomous/remediations/{runId:guid}/cancel", async (Guid runId, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
             var run = await orchestration.UpdateRemediationAsync(runId, x =>
                 x.State is "completed" or "failed" ? x : x with { State = "cancelled" }, ct).ConfigureAwait(false);
             return run is null ? Results.NotFound() : Results.Ok(run);
-        });
+        }).RequireAutonomousExecution();
 
         groups.Read.MapGet("/autonomous/rollouts", async (AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
             Results.Ok(await orchestration.GetRolloutsAsync(ct).ConfigureAwait(false)));
@@ -219,35 +230,35 @@ internal static class AutonomousProtectionEndpoints
 
             var rollout = await orchestration.CreateRolloutAsync(request, candidates, ct).ConfigureAwait(false);
             return Results.Created($"/api/v1/admin/autonomous/rollouts/{rollout.RolloutId}", rollout);
-        });
+        }).RequireAutonomousExecution();
 
         groups.Security.MapPost("/autonomous/rollouts/{rolloutId:guid}/start", async (Guid rolloutId, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
             var rollout = await orchestration.UpdateRolloutAsync(rolloutId, x =>
                 x.State == "draft" ? x with { State = "preflight", HoldReason = null, HeldFromState = null } : x, ct).ConfigureAwait(false);
             return rollout is null ? Results.NotFound() : rollout.State == "preflight" ? Results.Ok(rollout) : Results.Conflict(new { error = "Rollout must be draft before start.", rollout.State });
-        });
+        }).RequireAutonomousExecution();
 
         groups.Security.MapPost("/autonomous/rollouts/{rolloutId:guid}/hold", async (Guid rolloutId, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
             var rollout = await orchestration.UpdateRolloutAsync(rolloutId, x =>
                 x.State is "completed" or "cancelled" or "failed" or "held" ? x : x with { HeldFromState = x.State, State = "held", HoldReason = "Operator hold." }, ct).ConfigureAwait(false);
             return rollout is null ? Results.NotFound() : Results.Ok(rollout);
-        });
+        }).RequireAutonomousExecution();
 
         groups.Security.MapPost("/autonomous/rollouts/{rolloutId:guid}/resume", async (Guid rolloutId, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
             var rollout = await orchestration.UpdateRolloutAsync(rolloutId, x =>
                 x.State == "held" ? x with { State = x.HeldFromState ?? "preflight", HeldFromState = null, HoldReason = null } : x, ct).ConfigureAwait(false);
             return rollout is null ? Results.NotFound() : Results.Ok(rollout);
-        });
+        }).RequireAutonomousExecution();
 
         groups.Security.MapPost("/autonomous/rollouts/{rolloutId:guid}/cancel", async (Guid rolloutId, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
             var rollout = await orchestration.UpdateRolloutAsync(rolloutId, x =>
                 x.State == "completed" ? x : x with { State = "cancelled", HoldReason = "Operator cancelled." }, ct).ConfigureAwait(false);
             return rollout is null ? Results.NotFound() : Results.Ok(rollout);
-        });
+        }).RequireAutonomousExecution();
 
         return groups;
     }

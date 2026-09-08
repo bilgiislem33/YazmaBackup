@@ -16,7 +16,12 @@ using YazmaBackup.Domain;
 
 namespace YazmaBackup.ControlPlane.Hosting;
 
-internal sealed record ControlPlaneHostSettings(string StateEngine, bool AllowInsecureUiCookie, string AdminKey, bool LegacyAdminKeyEnabled);
+internal sealed record ControlPlaneHostSettings(
+    string StateEngine,
+    bool AllowInsecureUiCookie,
+    string AdminKey,
+    bool LegacyAdminKeyEnabled,
+    bool AutonomousExecutionEnabled);
 
 internal static class ControlPlaneHosting
 {
@@ -102,8 +107,14 @@ internal static class ControlPlaneHosting
         builder.Services.AddSingleton<BusinessServiceGraphService>();
         builder.Services.AddSingleton<DisasterRecoveryExecutionService>();
         builder.Services.AddSingleton(sp => new AutonomousOrchestrationStore(stateRoot, sp.GetRequiredService<IDataProtectionProvider>()));
+        var autonomousExecutionEnabled = string.Equals(
+            Environment.GetEnvironmentVariable(AutonomousExecutionPolicy.EnvironmentVariable),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+        builder.Services.AddSingleton(new AutonomousExecutionPolicy(autonomousExecutionEnabled));
         builder.Services.AddSingleton<AutonomousRemediationOrchestratorService>();
-        if (haRole != "standby") builder.Services.AddHostedService<AutonomousRemediationOrchestratorService>(services => services.GetRequiredService<AutonomousRemediationOrchestratorService>());
+        if (haRole != "standby" && autonomousExecutionEnabled)
+            builder.Services.AddHostedService<AutonomousRemediationOrchestratorService>(services => services.GetRequiredService<AutonomousRemediationOrchestratorService>());
         builder.Services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -152,7 +163,7 @@ internal static class ControlPlaneHosting
         if (haRole != "standby") builder.Services.AddHostedService<ProductionFabricOrchestratorService>();
         var legacyAdminKeyEnabled = string.Equals(Environment.GetEnvironmentVariable("YAZMABACKUP_ENABLE_LEGACY_ADMIN_KEY"), "true", StringComparison.OrdinalIgnoreCase);
         var adminKey = legacyAdminKeyEnabled ? Security.RequireSecret("YAZMABACKUP_ADMIN_KEY") : string.Empty;
-        return new(stateEngine, allowInsecureUiCookie, adminKey, legacyAdminKeyEnabled);
+        return new(stateEngine, allowInsecureUiCookie, adminKey, legacyAdminKeyEnabled, autonomousExecutionEnabled);
     }
 
     internal static async Task InitializeControlPlaneAsync(this WebApplication app)

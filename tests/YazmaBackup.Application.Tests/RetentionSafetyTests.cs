@@ -107,6 +107,98 @@ public sealed class RetentionSafetyTests
         Assert.Empty(repository.DeletedChunks);
     }
 
+    [Fact]
+    public async Task Planning_is_read_only_and_exposes_every_proposed_deletion()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new RetentionRepository([
+            Manifest("current", now, new BackupChunkRef("a", 1)),
+            Manifest("old-1", now.AddDays(-1), new BackupChunkRef("b", 1)),
+            Manifest("old-2", now.AddDays(-2), new BackupChunkRef("c", 1))]);
+
+        var plan = await new RetentionManager(repository).PlanAsync(
+            "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None);
+
+        Assert.Equal(new[] { "current" }, plan.KeepBackupIds);
+        Assert.Equal(new[] { "old-1", "old-2" }, plan.DeleteBackupIds);
+        Assert.Empty(repository.DeletedManifests);
+        Assert.Empty(repository.DeletedChunks);
+    }
+
+    [Fact]
+    public async Task Global_inventory_failure_aborts_before_first_manifest_delete()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new RetentionRepository([
+            Manifest("current", now, new BackupChunkRef("a", 1)),
+            Manifest("old", now.AddDays(-2), new BackupChunkRef("b", 1))])
+        {
+            FailGlobalInventory = true
+        };
+
+        await Assert.ThrowsAsync<IOException>(() => new RetentionManager(repository).ApplyAsync(
+            "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None));
+
+        Assert.Empty(repository.DeletedManifests);
+        Assert.Equal(2, repository.Manifests.Count);
+    }
+
+    [Fact]
+    public async Task Concurrent_backup_after_plan_aborts_retention_before_delete()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new RetentionRepository([
+            Manifest("current", now, new BackupChunkRef("a", 1)),
+            Manifest("old", now.AddDays(-2), new BackupChunkRef("b", 1))]);
+        repository.OnScopedInventory = call =>
+        {
+            if (call == 2)
+                repository.Manifests.Add(Manifest("concurrent", now.AddMinutes(1), new BackupChunkRef("c", 1)));
+        };
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => new RetentionManager(repository).ApplyAsync(
+            "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None));
+
+        Assert.Contains("inventory changed", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(repository.DeletedManifests);
+    }
+
+    [Fact]
+    public async Task Incomplete_global_inventory_is_treated_as_corruption_and_blocks_delete()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new RetentionRepository([
+            Manifest("current", now, new BackupChunkRef("a", 1)),
+            Manifest("old", now.AddDays(-2), new BackupChunkRef("b", 1))])
+        {
+            HiddenGlobalBackupId = "old"
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => new RetentionManager(repository).ApplyAsync(
+            "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None));
+
+        Assert.Empty(repository.DeletedManifests);
+    }
+
+    [Fact]
+    public async Task Manifest_delete_failure_never_starts_chunk_garbage_collection()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new RetentionRepository([
+            Manifest("current", now, new BackupChunkRef("live", 1)),
+            Manifest("old", now.AddDays(-2), new BackupChunkRef("old", 1))])
+        {
+            FailManifestDelete = true
+        };
+        repository.AddChunk("old", now.AddDays(-10));
+
+        await Assert.ThrowsAsync<IOException>(() => new RetentionManager(repository).ApplyAsync(
+            "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None));
+
+        Assert.Empty(repository.DeletedChunks);
+        Assert.Contains("old", repository.Chunks.Keys);
+    }
+
     private static BackupManifest Manifest(string backupId, DateTimeOffset created, BackupChunkRef chunk, string agentId = "agent-1")
     {
         var file = new BackupFileEntry("file.bin", chunk.Length, created, chunk.Sha256, [chunk]);
@@ -120,12 +212,19 @@ public sealed class RetentionSafetyTests
         public List<string> DeletedManifests { get; } = [];
         public List<string> DeletedChunks { get; } = [];
         public string? EncryptionKeyId => "test-key";
+        public bool FailGlobalInventory { get; init; }
+        public bool FailManifestDelete { get; init; }
+        public string? HiddenGlobalBackupId { get; init; }
+        public Action<int>? OnScopedInventory { get; set; }
+        private int ScopedInventoryCalls { get; set; }
 
         public void AddChunk(string hash, DateTimeOffset created) => Chunks[hash] = created;
 
         public Task<IReadOnlyList<BackupManifest>> ListManifestsAsync(string agentId, string? sourceRoot, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ScopedInventoryCalls++;
+            OnScopedInventory?.Invoke(ScopedInventoryCalls);
             var result = Manifests.Where(x => x.AgentId == agentId && (sourceRoot is null || string.Equals(Path.GetFullPath(x.SourceRoot), sourceRoot, StringComparison.OrdinalIgnoreCase))).ToArray();
             return Task.FromResult<IReadOnlyList<BackupManifest>>(result);
         }
@@ -133,12 +232,15 @@ public sealed class RetentionSafetyTests
         public Task<IReadOnlyList<BackupManifest>> ListAllManifestsAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult<IReadOnlyList<BackupManifest>>(Manifests.ToArray());
+            if (FailGlobalInventory) throw new IOException("Injected global inventory failure.");
+            return Task.FromResult<IReadOnlyList<BackupManifest>>(Manifests
+                .Where(x => x.BackupId != HiddenGlobalBackupId).ToArray());
         }
 
         public Task DeleteManifestAsync(string agentId, string backupId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (FailManifestDelete) throw new IOException("Injected manifest delete failure.");
             Manifests.RemoveAll(x => x.AgentId == agentId && x.BackupId == backupId);
             DeletedManifests.Add(backupId);
             return Task.CompletedTask;
