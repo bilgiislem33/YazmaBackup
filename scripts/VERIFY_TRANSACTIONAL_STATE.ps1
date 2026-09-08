@@ -1,7 +1,8 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
-$state=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
+$state=Get-YazmaBackupControlPlaneSource -Area State
 $pg=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\PostgreSqlStateEngine.cs')
 $proj=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\YazmaBackup.ControlPlane.csproj')
 foreach($x in @('YAZMABACKUP_STATE_ENGINE','postgresql','active-active production mode requires','/state-engine/status')){if(-not $program.Contains($x)){throw ('R12 Program invariant eksik: '+$x)}}

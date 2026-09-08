@@ -13,6 +13,18 @@ internal static class AdminEndpointModules
         groups.MapRepositoryKeyEndpoints();
         groups.MapBackupOperationEndpoints();
         groups.MapRestoreOperationEndpoints();
+        groups.MapFleetMonitoringEndpoints();
+        groups.MapAgentMaintenanceEndpoints();
+        groups.MapBackupPolicyEndpoints();
+        groups.MapManagementIdentityEndpoints();
+        groups.MapSettingsTransferEndpoints();
+        groups.MapAutonomousProtectionEndpoints();
+        groups.MapRecoveryManagementEndpoints();
+        groups.MapBusinessContinuityEndpoints();
+        groups.MapAlarmEndpoints();
+        groups.MapIntegrationCredentialEndpoints();
+        groups.MapMeshCentralManagementEndpoints();
+        groups.MapNotificationEndpoints();
         return groups;
     }
 }

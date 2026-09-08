@@ -105,18 +105,21 @@ jobs:
       - name: Run automated test suite with coverage
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts/test-results | Out-Null
-          dotnet test .\YazmaBackup.sln `
-            -c Release `
-            --no-build `
-            --no-restore `
-            --logger "trx;LogFileName=yazmabackup-tests.trx" `
-            --results-directory .\artifacts\test-results `
-            --collect "XPlat Code Coverage"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $projects = @(Get-ChildItem .\tests -Recurse -Filter '*Tests.csproj' -ErrorAction Stop)
+          foreach ($project in $projects) {
+            $results = Join-Path artifacts/test-results $project.BaseName
+            dotnet test $project.FullName -c Release --no-build --no-restore `
+              --logger "trx;LogFileName=tests.trx" --results-directory $results `
+              --collect "XPlat Code Coverage"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Enterprise SelfTest
         run: dotnet run --project src/YazmaBackup.SelfTest -c Release --no-build
+
+      - name: Complete Windows PowerShell 5.1 verification
+        shell: powershell
+        run: .\scripts\VERIFY.ps1
 
       - name: Upload test evidence
         if: always()

@@ -1,7 +1,8 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $svc=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\FleetBackupIntelligenceService.cs')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
 foreach($x in @('FleetBackupIntelligenceService','repository-capacity','backup-failed','policy-overdue','protection-locked','FleetScore','Priorities')){if(-not $svc.Contains($x)){throw ('R18 intelligence invariant eksik: '+$x)}}
 foreach($x in @('AddSingleton<FleetBackupIntelligenceService>','/fleet-intelligence')){if(-not $program.Contains($x)){throw ('R18 API invariant eksik: '+$x)}}

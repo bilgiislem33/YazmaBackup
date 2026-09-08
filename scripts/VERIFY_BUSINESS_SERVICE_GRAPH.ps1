@@ -1,8 +1,9 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
-$store=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
+$store=Get-YazmaBackupControlPlaneSource -Area State
 $svc=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\BusinessServiceGraphService.cs')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
 foreach($x in @('BusinessServiceDependencies','UpsertDependencyAsync','DeleteDependencyAsync')){if(-not $store.Contains($x)){throw ('R24 dependency persistence invariant eksik: '+$x)}}
 foreach($x in @('RecoveryDag','HasCycle','indegree','BLOCKED: dependency cycle','DependsOnServiceId')){if(-not $svc.Contains($x)){throw ('R24 graph invariant eksik: '+$x)}}

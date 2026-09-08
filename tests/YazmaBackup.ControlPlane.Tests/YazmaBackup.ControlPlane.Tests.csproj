@@ -18,4 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/YazmaBackup.ControlPlane/YazmaBackup.ControlPlane.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures/control-plane-routes.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

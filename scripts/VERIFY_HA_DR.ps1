@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 $ha=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\ControlPlaneHaRuntime.cs')
 $console=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
 

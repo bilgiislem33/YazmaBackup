@@ -1,9 +1,10 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $pg=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\PostgreSqlStateEngine.cs')
-$state=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
+$state=Get-YazmaBackupControlPlaneSource -Area State
 $dr=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\DisasterRecoveryExecutionService.cs')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
 foreach($x in @('completion_lease_id','database lease ownership changed','database lease expired','completionLeaseId','ux_yb_commands_idempotency_v2','command_type, idempotency_key')){
  if(-not $pg.Contains($x)){throw ('R25 PostgreSQL completion fence invariant eksik: '+$x)}

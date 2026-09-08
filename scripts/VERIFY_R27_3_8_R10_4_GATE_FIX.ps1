@@ -1,8 +1,9 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $gate=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'scripts\VERIFY_AUTONOMOUS_ORCHESTRATOR.ps1')
 $orch=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\AutonomousRemediationOrchestrator.cs')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
 
 if($gate.Contains("'silent mutation'")){throw 'Eski R10.4 wording gate geri gelmiş.'}

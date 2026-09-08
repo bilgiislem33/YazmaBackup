@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
-$state=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
+$state=Get-YazmaBackupControlPlaneSource -Area State
 $pg=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\PostgreSqlStateEngine.cs')
 foreach($x in @('ClaimNextCommandAsync','RenewCommandLeaseAsync','FOR UPDATE SKIP LOCKED','FOR UPDATE','lease_id uuid','lease_expires_at_utc','last_lease_renewal_utc','ix_yb_commands_claimable','ix_yb_commands_lease_expiry','Command exhausted after','commandLeaseEngine = "postgresql-skip-locked"')){
   if(-not $pg.Contains($x)){throw ('R16 PostgreSQL command transaction invariant eksik: '+$x)}

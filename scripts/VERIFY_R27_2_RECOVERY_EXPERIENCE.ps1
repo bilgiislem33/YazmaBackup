@@ -1,7 +1,8 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 foreach($x in @('RecoveryEvidenceTimeline','Recovery Evidence Timeline','Disaster Recovery War Room','Dependency Recovery Rail','War Room Başlat','Doğrula ve Sonraki Gate')){
  if(-not $ui.Contains($x)){throw ('R27.2 frontend invariant eksik: '+$x)}
 }

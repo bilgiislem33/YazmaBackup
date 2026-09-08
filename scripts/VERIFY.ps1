@@ -1,4 +1,5 @@
 ﻿$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 try {
@@ -51,9 +52,9 @@ try {
     foreach($required in @('ExtensionChangeRatioThreshold','HighEntropyRatioThreshold','EstimateEntropyAsync','ComputeSha256Async')){if($guard -notmatch $required){throw "Ransomware guard invariant eksik: $required"}}
 
     Write-Host '[5/23] Cookie / CSRF / RBAC / privilege boundary'
-    $program=Get-Content .\src\YazmaBackup.ControlPlane\Program.cs -Raw
+    $program=Get-YazmaBackupControlPlaneSource -Area Endpoints
     $mgmt=Get-Content .\src\YazmaBackup.ControlPlane\ManagementSecurity.cs -Raw
-    $state=Get-Content .\src\YazmaBackup.ControlPlane\StateStore.cs -Raw
+    $state=Get-YazmaBackupControlPlaneSource -Area State
     foreach($required in @('CookieAuthenticationDefaults.AuthenticationScheme','SameSiteMode.Strict','ValidCsrf','RequireRateLimiting("login")','IsInteractiveAdministrator','YAZMABACKUP_ENABLE_LEGACY_ADMIN_KEY')){if(($program+$mgmt) -notmatch [Regex]::Escape($required)){throw "Management invariant eksik: $required"}}
     if($program -notmatch 'request.Roles.Contains\(ManagementRoles.Administrator' -or $program -notmatch 'target.Roles.Contains\(ManagementRoles.Administrator'){throw 'Security Administrator → Administrator privilege boundary eksik.'}
     if($state -notmatch 'MaxFailedLogins = 5' -or $state -notmatch 'last enabled administrator cannot be disabled'){throw 'Account lockout/last-admin koruması eksik.'}
@@ -212,14 +213,14 @@ try {
     foreach($required in @('New-Service -Name $serviceName','DelayedAutoStart','Windows servisi oluşturulamadı (New-Service, 5 deneme)','ImagePath doğrulamasını geçemedi','OutputEncoding')){if($installer -notmatch [Regex]::Escape($required)){throw "R5.1 service creation reliability invariant eksik: $required"}}
     foreach($required in @('Repair-YazmaBackupProgramDataAcl','Set-PrivateAclOnRoot','ProgramData root ACL reset','ProgramData root private ACL grant','ProgramData descendant emergency grant','AllowNonZero','Critical identity private ACL','create/write/read/delete preflight','ProgramData ACL preflight başarısız','Yarım kalmış Agent identity/token çifti temizlendi','takeown.exe','/reset','/setowner')){if($installer -notmatch [Regex]::Escape($required)){throw "R5.4 ProgramData ACL recovery invariant eksik: $required"}}
 
-    $programCs = Get-Content (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs') -Raw
+    $programCs =Get-YazmaBackupControlPlaneSource -Area Endpoints
     foreach($required in @('YazmaBackupDeployLogs','tempLog','fallbackLog','canonicalLog','Copy-Item -LiteralPath $tempLog')){if($programCs -notmatch [Regex]::Escape($required)){throw "R5.5 bootstrap-safe logging invariant eksik: $required"}}
     foreach($required in @('System.Diagnostics.ProcessStartInfo','RedirectStandardOutput','RedirectStandardError','ReadToEndAsync','NativeCommandError','ProgramData early root ownership recovery','R5.6 ProgramData ACL recovery')){if($installer -notmatch [Regex]::Escape($required)){throw "R5.6 native ACL recovery invariant eksik: $required"}}
     if($installer -match '&\s+(?:takeown|icacls)\.exe[^\r\n]*2>&1'){throw 'R5.6 native ACL recovery kapısı: doğrudan native stderr redirection kalıntısı bulundu.'}
     foreach($required in @('Invoke-ServiceWmiChange','Win32_Service.Change','GetMethodParameters(''Change'')','New-GmsaServiceWmi','Win32_Service','GetMethodParameters(''Create'')','R5.7 Windows service configuration WMI/.NET path','Set-ItemProperty -LiteralPath $serviceRegistryPath -Name Description')){if($installer -notmatch [Regex]::Escape($required)){throw "R5.7 deterministic service configuration invariant eksik: $required"}}
     if($installer -match '(?im)^\s*&?\s*sc\.exe\s+(?:config|create|delete)\b'){throw 'R5.7 service gate: sc.exe config/create/delete install/update/rollback yolunda kullanılamaz.'}
 
-    $program = Get-Content -LiteralPath (Join-Path $root 'src/YazmaBackup.ControlPlane/Program.cs') -Raw
+    $program =Get-YazmaBackupControlPlaneSource -Area Endpoints
     $worker = Get-Content -LiteralPath (Join-Path $root 'src/YazmaBackup.ControlPlane/MeshCentralDeploymentHostedService.cs') -Raw
     foreach($required in @('x.AgentId == auth.Value.AgentId','Authenticated heartbeat completed exact deployment binding','exactDeployments.Length == 0 && hostCandidates.Length == 1','Agent heartbeat reconciled deployment immediately')){if($program -notmatch [Regex]::Escape($required)){throw "Exact deployment heartbeat reconciliation invariant eksik: $required"}}
     foreach($required in @('TrackEnrollment','TryConsumeEnrollment','MeshEnrollmentCorrelation')){if((Get-Content .\src\YazmaBackup.ControlPlane\MeshCentralBootstrapTicketService.cs -Raw) -notmatch [Regex]::Escape($required)){throw "Exact deployment enrollment correlation invariant eksik: $required"}}
@@ -252,7 +253,7 @@ try {
     $nasScope = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\NasConnectionScope.cs')
     $agentWorker = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\AgentWorker.cs')
     $contracts = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Contracts\Contracts.cs')
-    $program = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+    $program =Get-YazmaBackupControlPlaneSource -Area Endpoints
     $agentPaths = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\AgentPaths.cs')
     if($nasAgent -notmatch 'MachineSecretStore' -or $nasAgent -notmatch 'NasCredentialDirectory' -or $agentPaths -notmatch 'nas-credentials'){throw 'NAS credential DPAPI store invariant eksik.'}
     if($nasScope -notmatch 'WNetAddConnection2' -or $nasScope -notmatch 'WNetCancelConnection2'){throw 'NAS SMB connection scope invariant eksik.'}
@@ -263,13 +264,13 @@ try {
 
     Write-Host '[12f/23] Backup failure diagnostics / 503 resilience invariantları'
     $agentWorker = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\AgentWorker.cs')
-    $program = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+    $program =Get-YazmaBackupControlPlaneSource -Area Endpoints
     if($agentWorker -notmatch 'command-failed' -or $agentWorker -notmatch 'control-plane-temporarily-unavailable'){throw 'Agent failure diagnostics/backoff invariant eksik.'}
     if($program -notmatch 'ClassifyBackupError' -or $program -notmatch 'repositoryRoot = request\?\.RepositoryRoot'){throw 'Backup history diagnostic projection invariant eksik.'}
 
     Write-Host '[12g/23] Automatic repository key bootstrap invariantları'
     $vault = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\RepositoryKeyVault.cs')
-    $program = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+    $program =Get-YazmaBackupControlPlaneSource -Area Endpoints
     if($vault -notmatch 'IDataProtector' -or $vault -notmatch 'RandomNumberGenerator\.GetBytes\(32\)' -or $vault -notmatch 'repository-key-vault'){throw 'Protected central repository key vault invariant eksik.'}
     if($program -notmatch 'RepositoryKeyVault keyVault' -or $program -notmatch 'ProvisionRepositoryKey' -or $program -notmatch 'queued-before-backup'){throw 'Automatic repository key bootstrap ordering invariant eksik.'}
     if($program -notmatch 'RSAEncryptionPadding\.OaepSHA256'){throw 'Repository key Agent wrapping invariant eksik.'}
@@ -277,8 +278,8 @@ try {
     Write-Host '[12h/23] Domainless bilgisayar sahibi metadata invariantları'
     $models = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Domain\Models.cs')
     $contracts = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Contracts\Contracts.cs')
-    $store = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
-    $program = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+    $store =Get-YazmaBackupControlPlaneSource -Area State
+    $program =Get-YazmaBackupControlPlaneSource -Area Endpoints
     if($models -notmatch 'string\? AssignedUser = null'){throw 'Agent AssignedUser metadata invariant eksik.'}
     if($contracts -notmatch 'SetAgentAssignedUserRequest'){throw 'AssignedUser contract invariant eksik.'}
     if($store -notmatch 'SetAgentAssignedUserAsync' -or $store -notmatch 'AssignedUser = normalized'){throw 'AssignedUser persistence invariant eksik.'}
@@ -290,7 +291,7 @@ try {
     $worker = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\AgentWorker.cs')
     $applier = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\AgentUpdateApplier.cs')
     $installer = Get-Content -Raw -LiteralPath (Join-Path $root 'scripts\INSTALL_AGENT.ps1')
-    $program = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+    $program =Get-YazmaBackupControlPlaneSource -Area Endpoints
     if($models -notmatch 'ApplyStagedAgentUpdate = 23' -or $worker -notmatch 'ApplyStagedAgentUpdate'){throw 'Agent apply-update command invariant eksik.'}
     if($applier -notmatch 'update-ready.json' -or $applier -notmatch 'INSTALL_AGENT.ps1'){throw 'Staged update applier invariant eksik.'}
     if($installer -notmatch '\$inPlaceUpgrade' -or $installer -notmatch 'AgentId/token/config/repository keys/NAS credentials korunacak'){throw 'In-place identity preservation invariant eksik.'}
@@ -445,7 +446,7 @@ try {
     $meta=Get-Content .\VERSION.json -Raw | ConvertFrom-Json
     if($meta.version -ne '1.2.0' -or $meta.stateSchema -ne 11 -or $meta.productionReady -ne $false){throw 'VERSION.json invariantı başarısız.'}
     if(-not(Select-String -Path .\src\YazmaBackup.Agent\AgentWorker.cs -Pattern 'public const string AgentVersion = "1.2.0";' -SimpleMatch)){throw 'AgentVersion 1.2.0 değil.'}
-    if(-not(Select-String -Path .\src\YazmaBackup.ControlPlane\Program.cs -Pattern 'version = "1.2.0"' -SimpleMatch)){throw 'Health version 1.2.0 değil.'}
+    if(-not(Select-String -Path .\src\YazmaBackup.ControlPlane\Endpoints\HealthEndpoints.cs -Pattern 'version = "1.2.0"' -SimpleMatch)){throw 'Health version 1.2.0 değil.'}
     $projects=Get-ChildItem .\src -Recurse -File -Filter *.csproj
     if($projects.Count -ne 8){throw "Beklenen 8 proje yerine $($projects.Count) bulundu."}
 

@@ -1,7 +1,8 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
-$state=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
+$state=Get-YazmaBackupControlPlaneSource -Area State
 $coord=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\DistributedStateCoordinator.cs')
 foreach($x in @('active-active','DistributedStateConflictException','StatusCodes.Status409Conflict','Retry-After')){if(-not $program.Contains($x)){throw ('R11 Program invariant eksik: '+$x)}}
 foreach($x in @('AcquireWriteLeaseAsync','ReadVersion','WriteVersion','FileShare.None','distributed-state.writer.lock','distributed-state.version')){if(-not $coord.Contains($x)){throw ('R11 coordinator invariant eksik: '+$x)}}

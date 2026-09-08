@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
-$state=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\StateStore.cs')
+$state=Get-YazmaBackupControlPlaneSource -Area State
 $pg=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\PostgreSqlStateEngine.cs')
 foreach($x in @('_directSqlReads','YAZMABACKUP_DIRECT_SQL_READS','GetAgentsAsync','GetRecentCommandsAsync','GetBackupPoliciesAsync','GetAuditEventsAsync','GetAlarmsAsync','GetOperationalCommandMetricsAsync')){
   if(-not $state.Contains($x)){throw ('R14 StateStore direct-read invariant eksik: '+$x)}

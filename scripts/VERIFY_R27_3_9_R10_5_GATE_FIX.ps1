@@ -1,8 +1,9 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $gate=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'scripts\VERIFY_HA_DR.ps1')
 $ha=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\ControlPlaneHaRuntime.cs')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 
 if($gate.Contains('dpapi-local-machine')){throw 'Eski R10.5 VERIFY literal gate geri gelmiş.'}
 foreach($x in @('ReadyForTraffic','AcceptsMutations','portable')){

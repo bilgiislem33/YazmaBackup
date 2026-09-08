@@ -1,7 +1,8 @@
 ﻿$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 foreach($x in @('CommandCenterPage','YazmaBackup Command Center','NOC Mode','Live Operations','Repository Radar','Live Activity Stream','Gerçek yüzde telemetrisi olmadığı için progress yüzdesi uydurulmaz','Ctrl+K')){
  if(-not $ui.Contains($x)){throw ('R27 frontend experience invariant eksik: '+$x)}
 }
