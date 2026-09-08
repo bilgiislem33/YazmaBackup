@@ -19,7 +19,7 @@ jobs:
   windows-quality-gate:
     name: Windows quality gate
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -53,24 +53,33 @@ jobs:
         working-directory: src/YazmaBackup.Frontend
         run: npm run build
 
-      - name: Restore .NET
-        run: dotnet restore
+      - name: Restore complete solution
+        run: dotnet restore .\YazmaBackup.sln --nologo
 
-      - name: Build .NET warnings as errors
-        run: dotnet build -c Release --no-restore -warnaserror
+      - name: Build complete solution warnings as errors
+        run: dotnet build .\YazmaBackup.sln -c Release --no-restore --nologo -warnaserror
 
-      - name: Run automated tests
+      - name: Verify automated test projects exist
         shell: pwsh
         run: |
-          $projects = Get-ChildItem -Recurse -Filter '*Tests.csproj' | Select-Object -ExpandProperty FullName
-          if (-not $projects) {
-            throw 'No automated *Tests.csproj project exists. R28 CI fails closed.'
+          $projects = @(Get-ChildItem .\tests -Recurse -Filter '*Tests.csproj' -ErrorAction Stop)
+          if ($projects.Count -lt 3) {
+            throw "Expected at least 3 automated test projects, found $($projects.Count). R28 CI fails closed."
           }
+          $projects | ForEach-Object { Write-Host "TEST PROJECT: $($_.FullName)" }
+
+      - name: Run automated test suite with coverage
+        shell: pwsh
+        run: |
           New-Item -ItemType Directory -Force -Path artifacts/test-results | Out-Null
-          foreach ($project in $projects) {
-            dotnet test $project -c Release --no-restore --logger "trx;LogFileName=$([IO.Path]::GetFileNameWithoutExtension($project)).trx" --results-directory artifacts/test-results
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          dotnet test .\YazmaBackup.sln `
+            -c Release `
+            --no-build `
+            --no-restore `
+            --logger "trx;LogFileName=yazmabackup-tests.trx" `
+            --results-directory .\artifacts\test-results `
+            --collect "XPlat Code Coverage"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Enterprise SelfTest
         run: dotnet run --project src/YazmaBackup.SelfTest -c Release --no-build
@@ -79,7 +88,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-and-coverage
           path: artifacts/test-results
-          if-no-files-found: warn
-          retention-days: 14
+          if-no-files-found: error
+          retention-days: 30
