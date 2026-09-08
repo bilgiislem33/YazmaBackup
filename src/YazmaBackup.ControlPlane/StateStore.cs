@@ -1080,6 +1080,8 @@ public sealed partial class StateStore : IControlPlaneStore, IResilienceStore, I
             ClusterLeases = new Dictionary<string, ClusterLeaseRecord>(loaded.ClusterLeases, StringComparer.Ordinal),
             RepositoryHealth = new Dictionary<Guid, RepositoryHealthRecord>(loaded.RepositoryHealth),
             RecoveryPlans = new Dictionary<Guid, RecoveryPlanRecord>(loaded.RecoveryPlans),
+            BusinessServiceDependencies = new Dictionary<Guid, BusinessServiceDependencyRecord>(loaded.BusinessServiceDependencies),
+            DisasterRecoverySessions = new Dictionary<Guid, DisasterRecoverySessionRecord>(loaded.DisasterRecoverySessions),
             RecoveryRuns = new Dictionary<Guid, RecoveryRunRecord>(loaded.RecoveryRuns),
             MeshCentralLinks = new Dictionary<Guid, MeshCentralLinkRecord>(loaded.MeshCentralLinks),
             NotificationRoutes = new Dictionary<Guid, NotificationRouteRecord>(loaded.NotificationRoutes),
