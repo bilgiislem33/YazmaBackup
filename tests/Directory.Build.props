@@ -1,11 +1,11 @@
 <Project>
   <Import Project="../Directory.Build.props" />
-  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+  <PropertyGroup>
     <NoWarn>$(NoWarn);CA1707</NoWarn>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);CA1707</WarningsNotAsErrors>
     <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);CA1707</MSBuildWarningsNotAsErrors>
   </PropertyGroup>
-  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
