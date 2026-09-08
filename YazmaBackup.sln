@@ -18,6 +18,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YazmaBackup.SelfTest", "src
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YazmaBackup.SigningTool", "src\YazmaBackup.SigningTool\YazmaBackup.SigningTool.csproj", "{A0A1D3C5-7B74-4F76-9F08-5F6D2B2A20C1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YazmaBackup.Domain.Tests", "tests\YazmaBackup.Domain.Tests\YazmaBackup.Domain.Tests.csproj", "{78B5028B-B59A-43F0-8DA6-39CC0A6F88A1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YazmaBackup.Application.Tests", "tests\YazmaBackup.Application.Tests\YazmaBackup.Application.Tests.csproj", "{9BBE30B9-02F5-4E33-A0D2-D1F11FB917B7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YazmaBackup.ControlPlane.Tests", "tests\YazmaBackup.ControlPlane.Tests\YazmaBackup.ControlPlane.Tests.csproj", "{1F515036-43B6-4C47-B91D-3B7625DDB534}"
+EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|Any CPU = Debug|Any CPU
@@ -56,5 +62,17 @@ Global
         {A0A1D3C5-7B74-4F76-9F08-5F6D2B2A20C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {A0A1D3C5-7B74-4F76-9F08-5F6D2B2A20C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
         {A0A1D3C5-7B74-4F76-9F08-5F6D2B2A20C1}.Release|Any CPU.Build.0 = Release|Any CPU
+        {78B5028B-B59A-43F0-8DA6-39CC0A6F88A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {78B5028B-B59A-43F0-8DA6-39CC0A6F88A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {78B5028B-B59A-43F0-8DA6-39CC0A6F88A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {78B5028B-B59A-43F0-8DA6-39CC0A6F88A1}.Release|Any CPU.Build.0 = Release|Any CPU
+        {9BBE30B9-02F5-4E33-A0D2-D1F11FB917B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {9BBE30B9-02F5-4E33-A0D2-D1F11FB917B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {9BBE30B9-02F5-4E33-A0D2-D1F11FB917B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {9BBE30B9-02F5-4E33-A0D2-D1F11FB917B7}.Release|Any CPU.Build.0 = Release|Any CPU
+        {1F515036-43B6-4C47-B91D-3B7625DDB534}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {1F515036-43B6-4C47-B91D-3B7625DDB534}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {1F515036-43B6-4C47-B91D-3B7625DDB534}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {1F515036-43B6-4C47-B91D-3B7625DDB534}.Release|Any CPU.Build.0 = Release|Any CPU
     EndGlobalSection
 EndGlobal
