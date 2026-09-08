@@ -3,12 +3,13 @@ $root=Split-Path -Parent $PSScriptRoot
 $retention=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Application\RetentionManager.cs')
 $hosting=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Hosting\ControlPlaneHosting.cs')
 $autonomous=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\Endpoints\AutonomousProtectionEndpoints.cs')
+$autonomousPolicy=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.ControlPlane\AutonomousExecutionPolicy.cs')
 
 foreach($required in @('RetentionPlan','PlanAsync','allBeforeDelete','Retention inventory changed after planning','Global repository inventory is incomplete')){
   if(-not $retention.Contains($required)){throw ('Core retention fail-safe invariant eksik: '+$required)}
 }
 foreach($required in @('YAZMABACKUP_ENABLE_AUTONOMOUS_EXECUTION','autonomousExecutionEnabled')){
-  if(-not (($hosting+$autonomous).Contains($required))){throw ('Autonomous opt-in invariant eksik: '+$required)}
+  if(-not (($hosting+$autonomous+$autonomousPolicy).Contains($required))){throw ('Autonomous opt-in invariant eksik: '+$required)}
 }
 if($hosting -notmatch 'haRole != "standby" && autonomousExecutionEnabled'){
   throw 'Autonomous executor varsayılan kapalı çalışma sınırı eksik.'
