@@ -8,7 +8,7 @@ namespace YazmaBackup.ControlPlane.Tests;
 public sealed class AgentEndpointModulesTests
 {
     [Fact]
-    public void Agent_module_composition_registers_cutover_ready_enrollment_and_runtime_routes()
+    public void Agent_module_composition_registers_all_cutover_ready_agent_routes()
     {
         var builder = WebApplication.CreateBuilder();
         RegisterAgentDependencies(builder.Services);
@@ -28,6 +28,7 @@ public sealed class AgentEndpointModulesTests
 
         var expected = AgentEndpointContracts.EnrollmentRoutes
             .Concat(AgentEndpointContracts.RuntimeRoutes)
+            .Concat(AgentEndpointContracts.CommandRoutes)
             .OrderBy(static route => route, StringComparer.Ordinal)
             .ToArray();
 
@@ -53,5 +54,6 @@ public sealed class AgentEndpointModulesTests
         services.AddSingleton<MeshCentralBootstrapTicketService>(_ => null!);
         services.AddSingleton<GlobalNasProfileService>(_ => null!);
         services.AddSingleton<TransferTelemetryRegistry>(_ => null!);
+        services.AddSingleton<RepositoryKeyVault>(_ => null!);
     }
 }
