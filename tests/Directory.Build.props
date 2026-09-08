@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="../Directory.Build.props" />
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">
     <Using Include="Xunit" />
   </ItemGroup>
