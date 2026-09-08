@@ -10,4 +10,5 @@
   <Project Path="tests/YazmaBackup.Domain.Tests/YazmaBackup.Domain.Tests.csproj" />
   <Project Path="tests/YazmaBackup.Application.Tests/YazmaBackup.Application.Tests.csproj" />
   <Project Path="tests/YazmaBackup.ControlPlane.Tests/YazmaBackup.ControlPlane.Tests.csproj" />
+  <Project Path="tests/YazmaBackup.Infrastructure.Tests/YazmaBackup.Infrastructure.Tests.csproj" />
 </Solution>
