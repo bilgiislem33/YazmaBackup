@@ -43,7 +43,7 @@ public sealed class AgentEndpointModulesTests
     private static void RegisterEnrollmentDependencies(IServiceCollection services)
     {
         services.AddSingleton<IControlPlaneStore>(_ => null!);
-        services.AddSingleton<FleetAutopilotService>(_ => null!);
-        services.AddSingleton<EnrollmentTicketService>(_ => null!);
+        services.AddSingleton<IMeshCentralFleetStore>(_ => null!);
+        services.AddSingleton<MeshCentralBootstrapTicketService>(_ => null!);
     }
 }
