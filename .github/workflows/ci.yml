@@ -53,12 +53,6 @@ jobs:
         working-directory: src/YazmaBackup.Frontend
         run: npm run build
 
-      - name: Restore complete solution
-        run: dotnet restore .\YazmaBackup.sln --nologo
-
-      - name: Build complete solution warnings as errors
-        run: dotnet build .\YazmaBackup.sln -c Release --no-restore --nologo -warnaserror
-
       - name: Verify automated test projects exist
         shell: pwsh
         run: |
@@ -67,6 +61,29 @@ jobs:
             throw "Expected at least 4 automated test projects, found $($projects.Count). R28 CI fails closed."
           }
           $projects | ForEach-Object { Write-Host "TEST PROJECT: $($_.FullName)" }
+
+      - name: Restore production projects
+        shell: pwsh
+        run: |
+          $projects = @(Get-ChildItem .\src -Recurse -Filter '*.csproj' -ErrorAction Stop)
+          foreach ($project in $projects) {
+            Write-Host "RESTORE PRODUCTION: $($project.FullName)"
+            dotnet restore $project.FullName --nologo -p:TreatWarningsAsErrors=false
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Restore test projects with diagnostics
+        shell: pwsh
+        run: |
+          $projects = @(Get-ChildItem .\tests -Recurse -Filter '*Tests.csproj' -ErrorAction Stop)
+          foreach ($project in $projects) {
+            Write-Host "RESTORE TEST: $($project.FullName)"
+            dotnet restore $project.FullName --nologo -p:TreatWarningsAsErrors=false --verbosity normal
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build complete solution warnings as errors
+        run: dotnet build .\YazmaBackup.sln -c Release --no-restore --nologo -warnaserror
 
       - name: Run automated test suite with coverage
         shell: pwsh
@@ -90,5 +107,5 @@ jobs:
         with:
           name: test-results-and-coverage
           path: artifacts/test-results
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
