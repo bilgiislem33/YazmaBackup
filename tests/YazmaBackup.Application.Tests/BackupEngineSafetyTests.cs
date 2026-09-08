@@ -221,12 +221,6 @@ public sealed class BackupEngineSafetyTests
         public Task<IReadOnlyList<BackupManifest>> ListAllManifestsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<BackupManifest>>(WrittenManifests.ToArray());
 
-        public Task DeleteManifestAsync(string agentId, string backupId, CancellationToken cancellationToken)
-        {
-            WrittenManifests.RemoveAll(x => x.AgentId == agentId && x.BackupId == backupId);
-            return Task.CompletedTask;
-        }
-
         public async IAsyncEnumerable<string> EnumerateChunkHashesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
             foreach (var hash in StoredChunks.Keys)
@@ -236,9 +230,6 @@ public sealed class BackupEngineSafetyTests
                 await Task.Yield();
             }
         }
-
-        public Task<bool> DeleteChunkIfOlderThanAsync(string sha256, DateTimeOffset cutoffUtc, CancellationToken cancellationToken) =>
-            Task.FromResult(StoredChunks.Remove(sha256));
 
         public Task<Stream> OpenChunkReadAsync(string sha256, CancellationToken cancellationToken) =>
             Task.FromResult<Stream>(new MemoryStream(StoredChunks[sha256], writable: false));

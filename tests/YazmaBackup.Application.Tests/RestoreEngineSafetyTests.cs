@@ -213,9 +213,7 @@ public sealed class RestoreEngineSafetyTests
         public Task WriteManifestAsync(BackupManifest value, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyList<BackupManifest>> ListManifestsAsync(string agentId, string? sourceRoot, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<BackupManifest>>([manifest]);
         public Task<IReadOnlyList<BackupManifest>> ListAllManifestsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<BackupManifest>>([manifest]);
-        public Task DeleteManifestAsync(string agentId, string backupId, CancellationToken cancellationToken) => Task.CompletedTask;
         public async IAsyncEnumerable<string> EnumerateChunkHashesAsync([EnumeratorCancellation] CancellationToken cancellationToken) { foreach (var hash in Chunks.Keys) { cancellationToken.ThrowIfCancellationRequested(); yield return hash; await Task.Yield(); } }
-        public Task<bool> DeleteChunkIfOlderThanAsync(string sha256, DateTimeOffset cutoffUtc, CancellationToken cancellationToken) => Task.FromResult(false);
         public string DescribeManifestLocation(string agentId, string backupId) => $"memory://{agentId}/{backupId}";
     }
 
