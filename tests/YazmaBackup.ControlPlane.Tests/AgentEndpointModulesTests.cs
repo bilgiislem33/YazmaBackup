@@ -7,7 +7,7 @@ namespace YazmaBackup.ControlPlane.Tests;
 public sealed class AgentEndpointModulesTests
 {
     [Fact]
-    public void Agent_module_composition_is_safe_before_handler_cutover()
+    public void Agent_module_composition_registers_only_cutover_ready_enrollment_route()
     {
         var builder = WebApplication.CreateBuilder();
         var app = builder.Build();
@@ -15,7 +15,15 @@ public sealed class AgentEndpointModulesTests
         var result = app.MapAgentEndpointModules();
 
         Assert.Same(app, result);
-        Assert.Empty(((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints));
+        var routes = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Where(static route => route is not null)
+            .Select(static route => route!)
+            .ToArray();
+
+        Assert.Equal([AgentEndpointContracts.Register], routes);
     }
 
     [Fact]
