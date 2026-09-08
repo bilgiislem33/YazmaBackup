@@ -119,8 +119,10 @@ public sealed class RetentionSafetyTests
         var plan = await new RetentionManager(repository).PlanAsync(
             "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None);
 
-        Assert.Equal(new[] { "current" }, plan.KeepBackupIds);
-        Assert.Equal(new[] { "old-1", "old-2" }, plan.DeleteBackupIds);
+        Assert.Equal("current", Assert.Single(plan.KeepBackupIds));
+        Assert.Collection(plan.DeleteBackupIds,
+            item => Assert.Equal("old-1", item),
+            item => Assert.Equal("old-2", item));
         Assert.Empty(repository.DeletedManifests);
         Assert.Empty(repository.DeletedChunks);
     }
