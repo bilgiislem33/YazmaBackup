@@ -17,12 +17,6 @@ internal static class AgentEndpointModules
         return endpoints;
     }
 
-    internal static IEndpointRouteBuilder MapAgentRuntimeEndpoints(this IEndpointRouteBuilder endpoints)
-    {
-        ArgumentNullException.ThrowIfNull(endpoints);
-        return endpoints;
-    }
-
     internal static IEndpointRouteBuilder MapAgentCommandEndpoints(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
