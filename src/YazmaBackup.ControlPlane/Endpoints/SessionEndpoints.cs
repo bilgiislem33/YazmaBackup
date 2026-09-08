@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Routing;
 using YazmaBackup.Contracts;
+using YazmaBackup.Domain;
 
 namespace YazmaBackup.ControlPlane.Endpoints;
 
