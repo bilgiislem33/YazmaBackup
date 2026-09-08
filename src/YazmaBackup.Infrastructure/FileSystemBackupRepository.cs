@@ -6,7 +6,7 @@ using YazmaBackup.Domain;
 
 namespace YazmaBackup.Infrastructure;
 
-public sealed class FileSystemBackupRepository : IBackupRepository
+public sealed class FileSystemBackupRepository : IBackupRepository, IRetentionSafeRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private readonly string _root;
@@ -16,6 +16,8 @@ public sealed class FileSystemBackupRepository : IBackupRepository
     private readonly ITransferObserver? _transferObserver;
     private readonly string _metadataJsonPath;
     private readonly string _metadataEncryptedPath;
+    private readonly string _quarantineRoot;
+    private readonly string _mutationLockPath;
     private readonly bool _allowLegacyInitialization;
     private RepositoryMetadata _metadata;
 
@@ -37,6 +39,9 @@ public sealed class FileSystemBackupRepository : IBackupRepository
         _allowLegacyInitialization = allowLegacyInitialization;
         Directory.CreateDirectory(Path.Combine(_root, "chunks"));
         Directory.CreateDirectory(Path.Combine(_root, "manifests"));
+        _quarantineRoot = Path.Combine(_root, "quarantine", "manifests");
+        Directory.CreateDirectory(_quarantineRoot);
+        _mutationLockPath = Path.Combine(_root, ".repository-mutation.lock");
         _metadataJsonPath = Path.Combine(_root, "repository.json");
         _metadataEncryptedPath = Path.Combine(_root, "repository.meta");
         _metadata = InitializeMetadata();
@@ -179,9 +184,16 @@ public sealed class FileSystemBackupRepository : IBackupRepository
         }
     }
 
-    public async Task<BackupManifest> ReadManifestAsync(string agentId, string backupId, CancellationToken cancellationToken)
+    public Task<BackupManifest> ReadManifestAsync(string agentId, string backupId, CancellationToken cancellationToken) =>
+        ReadManifestCoreAsync(agentId, backupId, ResolveManifestPath(agentId, backupId), allowUpgrade: true, cancellationToken);
+
+    private async Task<BackupManifest> ReadManifestCoreAsync(
+        string agentId,
+        string backupId,
+        string path,
+        bool allowUpgrade,
+        CancellationToken cancellationToken)
     {
-        var path = ResolveManifestPath(agentId, backupId);
         var stored = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
         var digestPath = path + ".sha256";
         var encrypted = RepositoryCryptoContext.IsEncrypted(stored);
@@ -220,6 +232,7 @@ public sealed class FileSystemBackupRepository : IBackupRepository
 
             if (string.Equals(schemaVersion, "1", StringComparison.Ordinal))
             {
+                if (!allowUpgrade) throw new InvalidDataException("Legacy manifest cannot be upgraded from retention quarantine.");
                 var legacy = JsonSerializer.Deserialize<LegacyBackupManifest>(clear, JsonOptions)
                     ?? throw new InvalidDataException("Legacy manifest could not be deserialized.");
                 var upgraded = await UpgradeLegacyManifestAsync(legacy, cancellationToken).ConfigureAwait(false);
@@ -230,6 +243,7 @@ public sealed class FileSystemBackupRepository : IBackupRepository
 
             if (string.Equals(schemaVersion, "2", StringComparison.Ordinal))
             {
+                if (!allowUpgrade) throw new InvalidDataException("Version 2 manifest cannot be upgraded from retention quarantine.");
                 var version2 = JsonSerializer.Deserialize<BackupManifest>(clear, JsonOptions)
                     ?? throw new InvalidDataException("Version 2 manifest could not be deserialized.");
                 var upgraded = version2 with
@@ -291,15 +305,124 @@ public sealed class FileSystemBackupRepository : IBackupRepository
         return result;
     }
 
-    public Task DeleteManifestAsync(string agentId, string backupId, CancellationToken cancellationToken)
+    public async ValueTask<IAsyncDisposable> AcquireMutationLeaseAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var stream = new FileStream(
+                    _mutationLockPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None,
+                    bufferSize: 1,
+                    FileOptions.WriteThrough);
+                return new RepositoryMutationLease(stream);
+            }
+            catch (IOException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task QuarantineManifestAsync(
+        BackupManifest manifest,
+        DateTimeOffset immutableUntilUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        if (DateTimeOffset.UtcNow < immutableUntilUtc)
+            throw new InvalidOperationException($"Restore point {manifest.BackupId} is immutable until {immutableUntilUtc:O}.");
+
+        var activePath = ResolveManifestPath(manifest.AgentId, manifest.BackupId);
+        var active = await ReadManifestCoreAsync(
+            manifest.AgentId, manifest.BackupId, activePath, allowUpgrade: true, cancellationToken).ConfigureAwait(false);
+        if (active.CreatedAtUtc != manifest.CreatedAtUtc || !string.Equals(active.SourceRoot, manifest.SourceRoot, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Retention manifest identity changed before quarantine.");
+
+        var agentDirectory = Path.Combine(_quarantineRoot, SafeSegment(manifest.AgentId));
+        Directory.CreateDirectory(agentDirectory);
+        var finalDirectory = Path.Combine(agentDirectory, SafeSegment(manifest.BackupId));
+        if (!Directory.Exists(finalDirectory))
+        {
+            var stagingDirectory = finalDirectory + ".staging-" + Guid.NewGuid().ToString("N");
+            Directory.CreateDirectory(stagingDirectory);
+            try
+            {
+                var quarantinedAtUtc = DateTimeOffset.UtcNow;
+                foreach (var candidate in ManifestCandidatePaths(manifest.AgentId, manifest.BackupId))
+                {
+                    if (!File.Exists(candidate)) continue;
+                    await CopyFileDurablyAsync(candidate, Path.Combine(stagingDirectory, Path.GetFileName(candidate)), cancellationToken).ConfigureAwait(false);
+                    var sidecar = candidate + ".sha256";
+                    if (File.Exists(sidecar))
+                        await CopyFileDurablyAsync(sidecar, Path.Combine(stagingDirectory, Path.GetFileName(sidecar)), cancellationToken).ConfigureAwait(false);
+                }
+                var metadata = JsonSerializer.SerializeToUtf8Bytes(
+                    new QuarantineMetadata(manifest.AgentId, manifest.BackupId, quarantinedAtUtc), JsonOptions);
+                await AtomicWriteAsync(Path.Combine(stagingDirectory, "quarantine.json"), metadata, cancellationToken).ConfigureAwait(false);
+                Directory.Move(stagingDirectory, finalDirectory);
+            }
+            finally
+            {
+                if (Directory.Exists(stagingDirectory)) Directory.Delete(stagingDirectory, recursive: true);
+            }
+        }
+
+        // The complete recovery copy is durable before active files are removed.
+        foreach (var candidate in ManifestCandidatePaths(manifest.AgentId, manifest.BackupId))
+        {
+            if (File.Exists(candidate)) File.Delete(candidate);
+            if (File.Exists(candidate + ".sha256")) File.Delete(candidate + ".sha256");
+        }
+    }
+
+    public async Task<IReadOnlyList<QuarantinedBackupManifest>> ListQuarantinedManifestsAsync(CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(_quarantineRoot)) return [];
+        var result = new List<QuarantinedBackupManifest>();
+        foreach (var metadataPath in Directory.EnumerateFiles(_quarantineRoot, "quarantine.json", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var directory = Path.GetDirectoryName(metadataPath)!;
+            if (Path.GetFileName(directory).Contains(".staging-", StringComparison.Ordinal))
+                continue;
+            var metadata = JsonSerializer.Deserialize<QuarantineMetadata>(
+                await File.ReadAllBytesAsync(metadataPath, cancellationToken).ConfigureAwait(false), JsonOptions)
+                ?? throw new InvalidDataException($"Retention quarantine metadata is invalid: {metadataPath}");
+            var manifestPath = Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly)
+                .SingleOrDefault(path =>
+                    path.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase) ||
+                    (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+                     !path.EndsWith("quarantine.json", StringComparison.OrdinalIgnoreCase)))
+                ?? throw new InvalidDataException($"Retention quarantine manifest is missing: {directory}");
+            var manifest = await ReadManifestCoreAsync(
+                metadata.AgentId, metadata.BackupId, manifestPath, allowUpgrade: false, cancellationToken).ConfigureAwait(false);
+            result.Add(new(manifest, metadata.QuarantinedAtUtc));
+        }
+        return result;
+    }
+
+    public async Task PurgeQuarantinedManifestAsync(
+        string agentId,
+        string backupId,
+        DateTimeOffset expectedQuarantinedAtUtc,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        foreach (var path in ManifestCandidatePaths(agentId, backupId))
-        {
-            if (File.Exists(path)) File.Delete(path);
-            if (File.Exists(path + ".sha256")) File.Delete(path + ".sha256");
-        }
-        return Task.CompletedTask;
+        var directory = Path.Combine(_quarantineRoot, SafeSegment(agentId), SafeSegment(backupId));
+        var metadataPath = Path.Combine(directory, "quarantine.json");
+        if (!File.Exists(metadataPath)) throw new FileNotFoundException("Retention quarantine metadata was not found.", metadataPath);
+        var metadata = JsonSerializer.Deserialize<QuarantineMetadata>(
+            await File.ReadAllBytesAsync(metadataPath, cancellationToken).ConfigureAwait(false), JsonOptions)
+            ?? throw new InvalidDataException("Retention quarantine metadata is invalid.");
+        var purgeBeforeUtc = DateTimeOffset.UtcNow.Subtract(RetentionSafetyDefaults.ManifestQuarantinePeriod);
+        if (metadata.QuarantinedAtUtc != expectedQuarantinedAtUtc || metadata.QuarantinedAtUtc > purgeBeforeUtc)
+            throw new InvalidOperationException("Retention quarantine grace period has not elapsed or metadata changed.");
+        Directory.Delete(directory, recursive: true);
     }
 
     public async Task<IReadOnlySet<string>> GetReferencedEncryptionKeyIdsAsync(CancellationToken cancellationToken)
@@ -309,6 +432,7 @@ public sealed class FileSystemBackupRepository : IBackupRepository
         if (File.Exists(_metadataEncryptedPath)) candidates.Add(_metadataEncryptedPath);
         candidates.AddRange(Directory.EnumerateFiles(Path.Combine(_root, "chunks"), "*.chunk", SearchOption.AllDirectories));
         candidates.AddRange(Directory.EnumerateFiles(Path.Combine(_root, "manifests"), "*.manifest", SearchOption.AllDirectories));
+        candidates.AddRange(Directory.EnumerateFiles(_quarantineRoot, "*.manifest", SearchOption.AllDirectories));
 
         foreach (var path in candidates)
         {
@@ -695,6 +819,28 @@ public sealed class FileSystemBackupRepository : IBackupRepository
         }
     }
 
+    private static async Task CopyFileDurablyAsync(string source, string destination, CancellationToken cancellationToken)
+    {
+        var bytes = await File.ReadAllBytesAsync(source, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var output = new FileStream(
+                destination,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                64 * 1024,
+                FileOptions.Asynchronous | FileOptions.WriteThrough);
+            await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+            output.Flush(flushToDisk: true);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
     private async Task WriteThroughAsync(string path, ReadOnlyMemory<byte> content, bool throttle, CancellationToken cancellationToken)
     {
         await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.Asynchronous | FileOptions.WriteThrough);
@@ -800,6 +946,13 @@ public sealed class FileSystemBackupRepository : IBackupRepository
             base.Dispose(disposing);
         }
     }
+
+    private sealed class RepositoryMutationLease(FileStream stream) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => stream.DisposeAsync();
+    }
+
+    private sealed record QuarantineMetadata(string AgentId, string BackupId, DateTimeOffset QuarantinedAtUtc);
 
     private sealed record RepositoryMetadata(string SchemaVersion, string RepositoryId, bool Encrypted, string? EncryptionKeyId, string MigrationState, DateTimeOffset CreatedAtUtc);
 

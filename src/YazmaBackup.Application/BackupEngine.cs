@@ -26,6 +26,10 @@ public sealed class BackupEngine(
         ArgumentException.ThrowIfNullOrWhiteSpace(agentId);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceRoot);
 
+        await using var mutationLease = repository is IRepositoryMutationCoordinator coordinator
+            ? await coordinator.AcquireMutationLeaseAsync(cancellationToken).ConfigureAwait(false)
+            : null;
+
         var normalizedSource = Path.GetFullPath(sourceRoot);
         if (!Directory.Exists(normalizedSource))
             throw new DirectoryNotFoundException(normalizedSource);

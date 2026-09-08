@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "Full cumulative package. Removes obsolete dpapi-local-machine literal from R10.5 VERIFY and validates current HA runtime/program behavior. Agent unchanged.",
-  "releaseRevision": "r27.3.9-r10.5-current-ha-behavior-gate"
+  "notes": "R29.1 retention safety: repository-wide mutation lease, recoverable seven-day manifest quarantine, repository-enforced immutability and quarantine-aware chunk/key reference protection.",
+  "releaseRevision": "r29.1-retention-safety"
 }

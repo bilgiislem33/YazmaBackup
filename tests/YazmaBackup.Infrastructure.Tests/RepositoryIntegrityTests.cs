@@ -117,6 +117,101 @@ public sealed class RepositoryIntegrityTests
         Assert.False(File.Exists(Path.Combine(directory.Path, "repository.json")));
     }
 
+    [Fact]
+    public async Task Retention_quarantine_keeps_a_recoverable_verified_manifest_copy()
+    {
+        using var directory = new TemporaryDirectory();
+        using var crypto = Crypto("key-a");
+        var repository = new FileSystemBackupRepository(directory.Path, "repo-a", crypto);
+        var manifest = Manifest("backup-1", "critical.bin", "manifest-data"u8.ToArray());
+        await repository.WriteManifestAsync(manifest, CancellationToken.None);
+
+        await using var lease = await repository.AcquireMutationLeaseAsync(CancellationToken.None);
+        await repository.QuarantineManifestAsync(manifest, DateTimeOffset.MinValue, CancellationToken.None);
+
+        Assert.Empty(await repository.ListManifestsAsync(manifest.AgentId, null, CancellationToken.None));
+        var quarantined = Assert.Single(await repository.ListQuarantinedManifestsAsync(CancellationToken.None));
+        Assert.Equal(manifest.BackupId, quarantined.Manifest.BackupId);
+        Assert.Equal(manifest.Files[0].Sha256, quarantined.Manifest.Files[0].Sha256);
+        Assert.True(Directory.EnumerateFiles(directory.Path, "*.manifest", SearchOption.AllDirectories).Any());
+    }
+
+    [Fact]
+    public async Task Repository_enforces_manifest_immutability_before_quarantine()
+    {
+        using var directory = new TemporaryDirectory();
+        using var crypto = Crypto("key-a");
+        var repository = new FileSystemBackupRepository(directory.Path, "repo-a", crypto);
+        var manifest = Manifest("backup-1", "critical.bin", "manifest-data"u8.ToArray());
+        await repository.WriteManifestAsync(manifest, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.QuarantineManifestAsync(
+            manifest, DateTimeOffset.UtcNow.AddHours(1), CancellationToken.None));
+
+        Assert.Single(await repository.ListManifestsAsync(manifest.AgentId, null, CancellationToken.None));
+        Assert.Empty(await repository.ListQuarantinedManifestsAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Premature_quarantine_purge_is_rejected_by_repository()
+    {
+        using var directory = new TemporaryDirectory();
+        using var crypto = Crypto("key-a");
+        var repository = new FileSystemBackupRepository(directory.Path, "repo-a", crypto);
+        var manifest = Manifest("backup-1", "critical.bin", "manifest-data"u8.ToArray());
+        await repository.WriteManifestAsync(manifest, CancellationToken.None);
+        await repository.QuarantineManifestAsync(manifest, DateTimeOffset.MinValue, CancellationToken.None);
+        var quarantined = Assert.Single(await repository.ListQuarantinedManifestsAsync(CancellationToken.None));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.PurgeQuarantinedManifestAsync(
+            manifest.AgentId, manifest.BackupId, quarantined.QuarantinedAtUtc, CancellationToken.None));
+
+        Assert.Single(await repository.ListQuarantinedManifestsAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Repository_mutation_lease_serializes_independent_repository_instances()
+    {
+        using var directory = new TemporaryDirectory();
+        using var firstCrypto = Crypto("key-a");
+        using var secondCrypto = Crypto("key-a");
+        var first = new FileSystemBackupRepository(directory.Path, "repo-a", firstCrypto);
+        var second = new FileSystemBackupRepository(directory.Path, "repo-a", secondCrypto);
+
+        await using var held = await first.AcquireMutationLeaseAsync(CancellationToken.None);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            second.AcquireMutationLeaseAsync(timeout.Token).AsTask());
+    }
+
+    [Fact]
+    public async Task Quarantined_manifest_keeps_its_encryption_key_referenced()
+    {
+        using var directory = new TemporaryDirectory();
+        using var crypto = Crypto("key-a");
+        var repository = new FileSystemBackupRepository(directory.Path, "repo-a", crypto);
+        var manifest = Manifest("backup-1", "critical.bin", "manifest-data"u8.ToArray());
+        await repository.WriteManifestAsync(manifest, CancellationToken.None);
+        await repository.QuarantineManifestAsync(manifest, DateTimeOffset.MinValue, CancellationToken.None);
+
+        var referencedKeys = await repository.GetReferencedEncryptionKeyIdsAsync(CancellationToken.None);
+
+        Assert.Contains("key-a", referencedKeys);
+    }
+
+    [Fact]
+    public async Task Incomplete_quarantine_staging_directory_is_ignored()
+    {
+        using var directory = new TemporaryDirectory();
+        using var crypto = Crypto("key-a");
+        var repository = new FileSystemBackupRepository(directory.Path, "repo-a", crypto);
+        var staging = Path.Combine(directory.Path, "quarantine", "manifests", "agent-test", "backup-1.staging-crash");
+        Directory.CreateDirectory(staging);
+        await File.WriteAllTextAsync(Path.Combine(staging, "quarantine.json"), "{}");
+
+        Assert.Empty(await repository.ListQuarantinedManifestsAsync(CancellationToken.None));
+    }
+
     private static RepositoryCryptoContext Crypto(string keyId)
     {
         var key = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("YazmaBackup.Tests/" + keyId));

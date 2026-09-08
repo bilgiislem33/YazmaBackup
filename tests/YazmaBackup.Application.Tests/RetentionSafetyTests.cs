@@ -201,18 +201,37 @@ public sealed class RetentionSafetyTests
         Assert.Contains("old", repository.Chunks.Keys);
     }
 
+    [Fact]
+    public async Task Chunk_referenced_only_by_quarantined_manifest_is_not_collected()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new RetentionRepository([
+            Manifest("current", now, new BackupChunkRef("live", 1)),
+            Manifest("old", now.AddDays(-20), new BackupChunkRef("quarantined-only", 1))]);
+        repository.AddChunk("live", now.AddDays(-20));
+        repository.AddChunk("quarantined-only", now.AddDays(-20));
+
+        await new RetentionManager(repository).ApplyAsync(
+            "agent-1", "C:\\source", new RetentionPolicy(1, 0, 0, 0, 0), CancellationToken.None);
+
+        Assert.Single(repository.QuarantinedManifests);
+        Assert.Contains("quarantined-only", repository.Chunks.Keys);
+        Assert.DoesNotContain("quarantined-only", repository.DeletedChunks);
+    }
+
     private static BackupManifest Manifest(string backupId, DateTimeOffset created, BackupChunkRef chunk, string agentId = "agent-1")
     {
         var file = new BackupFileEntry("file.bin", chunk.Length, created, chunk.Sha256, [chunk]);
         return new BackupManifest("3", backupId, agentId, "C:\\source", created, [file], chunk.Length, chunk.Length, 1, 0, "test", false);
     }
 
-    private sealed class RetentionRepository(IEnumerable<BackupManifest> manifests) : IBackupRepository
+    private sealed class RetentionRepository(IEnumerable<BackupManifest> manifests) : IBackupRepository, IRetentionSafeRepository
     {
         public List<BackupManifest> Manifests { get; } = [.. manifests];
         public Dictionary<string, DateTimeOffset> Chunks { get; } = new(StringComparer.Ordinal);
         public List<string> DeletedManifests { get; } = [];
         public List<string> DeletedChunks { get; } = [];
+        public List<QuarantinedBackupManifest> QuarantinedManifests { get; } = [];
         public string? EncryptionKeyId => "test-key";
         public bool FailGlobalInventory { get; init; }
         public bool FailManifestDelete { get; init; }
@@ -239,13 +258,37 @@ public sealed class RetentionSafetyTests
                 .Where(x => x.BackupId != HiddenGlobalBackupId).ToArray());
         }
 
-        public Task DeleteManifestAsync(string agentId, string backupId, CancellationToken cancellationToken)
+        public Task QuarantineManifestAsync(BackupManifest manifest, DateTimeOffset immutableUntilUtc, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (FailManifestDelete) throw new IOException("Injected manifest delete failure.");
-            Manifests.RemoveAll(x => x.AgentId == agentId && x.BackupId == backupId);
-            DeletedManifests.Add(backupId);
+            if (DateTimeOffset.UtcNow < immutableUntilUtc) throw new InvalidOperationException("Manifest is immutable.");
+            Manifests.RemoveAll(x => x.AgentId == manifest.AgentId && x.BackupId == manifest.BackupId);
+            QuarantinedManifests.Add(new(manifest, DateTimeOffset.UtcNow));
+            DeletedManifests.Add(manifest.BackupId);
             return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<QuarantinedBackupManifest>> ListQuarantinedManifestsAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<QuarantinedBackupManifest>>(QuarantinedManifests.ToArray());
+        }
+
+        public Task PurgeQuarantinedManifestAsync(string agentId, string backupId, DateTimeOffset expectedQuarantinedAtUtc, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var item = QuarantinedManifests.Single(x => x.Manifest.AgentId == agentId && x.Manifest.BackupId == backupId);
+            if (item.QuarantinedAtUtc != expectedQuarantinedAtUtc || item.QuarantinedAtUtc > DateTimeOffset.UtcNow.Subtract(RetentionSafetyDefaults.ManifestQuarantinePeriod))
+                throw new InvalidOperationException("Quarantine grace period has not elapsed.");
+            QuarantinedManifests.Remove(item);
+            return Task.CompletedTask;
+        }
+
+        public ValueTask<IAsyncDisposable> AcquireMutationLeaseAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult<IAsyncDisposable>(new NoopLease());
         }
 
         public async IAsyncEnumerable<string> EnumerateChunkHashesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
@@ -273,5 +316,10 @@ public sealed class RetentionSafetyTests
         public Task<BackupManifest> ReadManifestAsync(string agentId, string backupId, CancellationToken cancellationToken) => Task.FromResult(Manifests.Single(x => x.AgentId == agentId && x.BackupId == backupId));
         public Task<Stream> OpenChunkReadAsync(string sha256, CancellationToken cancellationToken) => throw new NotSupportedException();
         public string DescribeManifestLocation(string agentId, string backupId) => $"memory://{agentId}/{backupId}";
+
+        private sealed class NoopLease : IAsyncDisposable
+        {
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
     }
 }

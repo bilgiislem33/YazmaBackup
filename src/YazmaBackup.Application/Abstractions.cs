@@ -16,12 +16,46 @@ public interface IBackupRepository
     Task<BackupManifest> ReadManifestAsync(string agentId, string backupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<BackupManifest>> ListManifestsAsync(string agentId, string? sourceRoot, CancellationToken cancellationToken);
     Task<IReadOnlyList<BackupManifest>> ListAllManifestsAsync(CancellationToken cancellationToken);
-    Task DeleteManifestAsync(string agentId, string backupId, CancellationToken cancellationToken);
     IAsyncEnumerable<string> EnumerateChunkHashesAsync(CancellationToken cancellationToken);
-    Task<bool> DeleteChunkIfOlderThanAsync(string sha256, DateTimeOffset cutoffUtc, CancellationToken cancellationToken);
     Task<Stream> OpenChunkReadAsync(string sha256, CancellationToken cancellationToken);
     string DescribeManifestLocation(string agentId, string backupId);
     string? EncryptionKeyId { get; }
+}
+
+public interface IRepositoryMutationCoordinator
+{
+    ValueTask<IAsyncDisposable> AcquireMutationLeaseAsync(CancellationToken cancellationToken);
+}
+
+public sealed record QuarantinedBackupManifest(
+    BackupManifest Manifest,
+    DateTimeOffset QuarantinedAtUtc);
+
+public static class RetentionSafetyDefaults
+{
+    public static readonly TimeSpan ManifestQuarantinePeriod = TimeSpan.FromDays(7);
+}
+
+public interface IRetentionSafeRepository : IRepositoryMutationCoordinator
+{
+    Task QuarantineManifestAsync(
+        BackupManifest manifest,
+        DateTimeOffset immutableUntilUtc,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<QuarantinedBackupManifest>> ListQuarantinedManifestsAsync(
+        CancellationToken cancellationToken);
+
+    Task PurgeQuarantinedManifestAsync(
+        string agentId,
+        string backupId,
+        DateTimeOffset expectedQuarantinedAtUtc,
+        CancellationToken cancellationToken);
+
+    Task<bool> DeleteChunkIfOlderThanAsync(
+        string sha256,
+        DateTimeOffset cutoffUtc,
+        CancellationToken cancellationToken);
 }
 
 public interface ISnapshotProvider

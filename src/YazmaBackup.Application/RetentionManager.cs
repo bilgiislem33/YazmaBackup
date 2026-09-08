@@ -23,6 +23,9 @@ public sealed class RetentionManager(IBackupRepository repository)
         RetentionPolicy policy,
         CancellationToken cancellationToken)
     {
+        if (repository is not IRetentionSafeRepository safeRepository)
+            throw new InvalidOperationException("Retention requires a repository with mutation fencing and recoverable manifest quarantine.");
+        await using var mutationLease = await safeRepository.AcquireMutationLeaseAsync(cancellationToken).ConfigureAwait(false);
         var plan = await PlanAsync(agentId, sourceRoot, policy, cancellationToken).ConfigureAwait(false);
         if (plan.InventoryBackupIds.Count == 0) return new RetentionSummary(0, 0, 0);
 
@@ -49,19 +52,39 @@ public sealed class RetentionManager(IBackupRepository repository)
         foreach (var manifest in delete)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await repository.DeleteManifestAsync(manifest.AgentId, manifest.BackupId, cancellationToken).ConfigureAwait(false);
+            await safeRepository.QuarantineManifestAsync(
+                manifest,
+                manifest.CreatedAtUtc.AddHours(policy.ImmutabilityHours),
+                cancellationToken).ConfigureAwait(false);
         }
 
         var allRemaining = await repository.ListAllManifestsAsync(cancellationToken).ConfigureAwait(false);
+        var quarantined = await safeRepository.ListQuarantinedManifestsAsync(cancellationToken).ConfigureAwait(false);
+        var purgeBeforeUtc = DateTimeOffset.UtcNow.Subtract(RetentionSafetyDefaults.ManifestQuarantinePeriod);
+        var purge = quarantined.Where(item => item.QuarantinedAtUtc <= purgeBeforeUtc).ToArray();
+        foreach (var item in purge)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await safeRepository.PurgeQuarantinedManifestAsync(
+                item.Manifest.AgentId,
+                item.Manifest.BackupId,
+                item.QuarantinedAtUtc,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var purgedIds = purge.Select(item => (item.Manifest.AgentId, item.Manifest.BackupId)).ToHashSet();
+        var protectedManifests = allRemaining.Concat(quarantined
+            .Where(item => !purgedIds.Contains((item.Manifest.AgentId, item.Manifest.BackupId)))
+            .Select(item => item.Manifest));
         var referenced = new HashSet<string>(
-            allRemaining.SelectMany(m => m.Files).SelectMany(f => f.Chunks).Select(c => c.Sha256),
+            protectedManifests.SelectMany(m => m.Files).SelectMany(f => f.Chunks).Select(c => c.Sha256),
             StringComparer.Ordinal);
         var cutoff = DateTimeOffset.UtcNow.Subtract(OrphanChunkGracePeriod);
         var deletedChunks = 0;
         await foreach (var hash in repository.EnumerateChunkHashesAsync(cancellationToken).ConfigureAwait(false))
         {
             if (referenced.Contains(hash)) continue;
-            if (await repository.DeleteChunkIfOlderThanAsync(hash, cutoff, cancellationToken).ConfigureAwait(false))
+            if (await safeRepository.DeleteChunkIfOlderThanAsync(hash, cutoff, cancellationToken).ConfigureAwait(false))
                 deletedChunks++;
         }
 
