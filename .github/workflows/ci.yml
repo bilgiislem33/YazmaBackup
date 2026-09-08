@@ -63,8 +63,8 @@ jobs:
         shell: pwsh
         run: |
           $projects = @(Get-ChildItem .\tests -Recurse -Filter '*Tests.csproj' -ErrorAction Stop)
-          if ($projects.Count -lt 3) {
-            throw "Expected at least 3 automated test projects, found $($projects.Count). R28 CI fails closed."
+          if ($projects.Count -lt 4) {
+            throw "Expected at least 4 automated test projects, found $($projects.Count). R28 CI fails closed."
           }
           $projects | ForEach-Object { Write-Host "TEST PROJECT: $($_.FullName)" }
 
