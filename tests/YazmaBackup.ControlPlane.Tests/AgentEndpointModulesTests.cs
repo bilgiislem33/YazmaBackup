@@ -8,10 +8,10 @@ namespace YazmaBackup.ControlPlane.Tests;
 public sealed class AgentEndpointModulesTests
 {
     [Fact]
-    public void Agent_module_composition_registers_only_cutover_ready_enrollment_route()
+    public void Agent_module_composition_registers_cutover_ready_enrollment_and_runtime_routes()
     {
         var builder = WebApplication.CreateBuilder();
-        RegisterEnrollmentDependencies(builder.Services);
+        RegisterAgentDependencies(builder.Services);
         var app = builder.Build();
 
         var result = app.MapAgentEndpointModules();
@@ -23,16 +23,22 @@ public sealed class AgentEndpointModulesTests
             .Select(endpoint => endpoint.RoutePattern.RawText)
             .Where(static route => route is not null)
             .Select(static route => route!)
+            .OrderBy(static route => route, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([AgentEndpointContracts.Register], routes);
+        var expected = AgentEndpointContracts.EnrollmentRoutes
+            .Concat(AgentEndpointContracts.RuntimeRoutes)
+            .OrderBy(static route => route, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(expected, routes);
     }
 
     [Fact]
     public void Individual_agent_modules_preserve_the_same_composition_root()
     {
         var builder = WebApplication.CreateBuilder();
-        RegisterEnrollmentDependencies(builder.Services);
+        RegisterAgentDependencies(builder.Services);
         var app = builder.Build();
 
         Assert.Same(app, app.MapAgentEnrollmentEndpoints());
@@ -40,10 +46,12 @@ public sealed class AgentEndpointModulesTests
         Assert.Same(app, app.MapAgentCommandEndpoints());
     }
 
-    private static void RegisterEnrollmentDependencies(IServiceCollection services)
+    private static void RegisterAgentDependencies(IServiceCollection services)
     {
         services.AddSingleton<IControlPlaneStore>(_ => null!);
         services.AddSingleton<IMeshCentralFleetStore>(_ => null!);
         services.AddSingleton<MeshCentralBootstrapTicketService>(_ => null!);
+        services.AddSingleton<GlobalNasProfileService>(_ => null!);
+        services.AddSingleton<TransferTelemetryRegistry>(_ => null!);
     }
 }
