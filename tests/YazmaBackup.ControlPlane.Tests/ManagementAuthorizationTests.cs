@@ -81,9 +81,8 @@ public sealed class ManagementAuthorizationTests
         });
 
         Assert.False(invoked);
-        var httpResult = Assert.IsAssignableFrom<IResult>(result);
-        await httpResult.ExecuteAsync(http);
-        Assert.Equal(StatusCodes.Status403Forbidden, http.Response.StatusCode);
+        var statusResult = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, statusResult.StatusCode);
     }
 
     [Fact]
@@ -117,9 +116,8 @@ public sealed class ManagementAuthorizationTests
         });
 
         Assert.False(invoked);
-        var httpResult = Assert.IsAssignableFrom<IResult>(result);
-        await httpResult.ExecuteAsync(http);
-        Assert.Equal(StatusCodes.Status401Unauthorized, http.Response.StatusCode);
+        var statusResult = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, statusResult.StatusCode);
     }
 
     private static ClaimsPrincipal Principal(string role, bool mustChangePassword = false)
