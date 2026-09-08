@@ -7,4 +7,7 @@
   <Project Path="src/YazmaBackup.Agent/YazmaBackup.Agent.csproj" />
   <Project Path="src/YazmaBackup.SelfTest/YazmaBackup.SelfTest.csproj" />
   <Project Path="src/YazmaBackup.SigningTool/YazmaBackup.SigningTool.csproj" />
+  <Project Path="tests/YazmaBackup.Domain.Tests/YazmaBackup.Domain.Tests.csproj" />
+  <Project Path="tests/YazmaBackup.Application.Tests/YazmaBackup.Application.Tests.csproj" />
+  <Project Path="tests/YazmaBackup.ControlPlane.Tests/YazmaBackup.ControlPlane.Tests.csproj" />
 </Solution>
