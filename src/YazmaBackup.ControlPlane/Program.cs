@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using YazmaBackup.Contracts;
 using YazmaBackup.ControlPlane;
+using YazmaBackup.ControlPlane.Endpoints;
 using YazmaBackup.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -1384,16 +1385,6 @@ static async Task<IResult> EnqueueAsync<TPayload>(Guid agentId, AgentCommandType
     catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
 }
 
-static async Task<(Guid AgentId, AgentRecord Record)?> AuthenticateAgentAsync(HttpContext http, IControlPlaneStore store, CancellationToken ct)
-{
-    if (!Guid.TryParse(http.Request.Headers["X-YazmaBackup-Agent-Id"].FirstOrDefault(), out var agentId)) return null;
-    var token = http.Request.Headers.Authorization.FirstOrDefault();
-    const string prefix = "Bearer ";
-    if (token is null || !token.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
-    var record = await store.AuthenticateAsync(agentId, token[prefix.Length..], ct).ConfigureAwait(false);
-    return record is null ? null : (agentId, record);
-}
-
 static bool ValidBackupRequest(string path, string repositoryRoot, string repositoryId, long activeRate, long idleRate, int idleThresholdSeconds, RetentionPolicy retention, ProtectionPolicy protection, out string? error)
 {
     error = null;
@@ -1442,9 +1433,6 @@ static BackupPolicyDto ToPolicyDto(BackupPolicyRecord p) =>
         p.RestoreDrillIntervalDays, p.LastRestoreDrillScheduledAtUtc, p.NextRestoreDrillAtUtc,
         p.RepositoryHealthIntervalHours, p.LastRepositoryHealthScheduledAtUtc, p.NextRepositoryHealthAtUtc);
 
-static SessionUserDto ToSessionUser(ManagementUserRecord user) =>
-    new(user.UserId, user.Username, user.DisplayName, user.Roles, user.MustChangePassword);
-
 static ManagementUserDto ToManagementUserDto(ManagementUserRecord user) =>
     new(user.UserId, user.Username, user.DisplayName, user.Roles, user.Enabled, user.MustChangePassword, user.CreatedAtUtc, user.LastLoginAtUtc, user.LockedUntilUtc);
 
@@ -1455,7 +1443,6 @@ static bool ValidCsrf(HttpContext http)
     return !string.IsNullOrWhiteSpace(cookie) && !string.IsNullOrWhiteSpace(header) && Security.ConstantTimeEquals(header, cookie);
 }
 
-static bool ValidMachine(string? value) => ValidText(value, 128);
 static bool ValidText(string? value, int max) => !string.IsNullOrWhiteSpace(value) && value.Length <= max;
 static string? ClassifyBackupError(string? error)
 {
@@ -1486,41 +1473,3 @@ static string? ClassifyBackupError(string? error)
 static bool ValidPathInput(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 32767;
 static bool ValidIdentifier(string? value, int max) => !string.IsNullOrWhiteSpace(value) && value.Length <= max && value.All(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.');
 static bool ValidSha256(string? value) => value is not null && value.Length == 64 && value.All(Uri.IsHexDigit);
-static bool ValidOptionalPublicKey(string? pem) => string.IsNullOrWhiteSpace(pem) || ValidPublicKey(pem);
-static bool ValidPublicKey(string? pem)
-{
-    if (string.IsNullOrWhiteSpace(pem) || pem.Length > 8192) return false;
-    try
-    {
-        using var rsa = RSA.Create();
-        rsa.ImportFromPem(pem);
-        return rsa.KeySize >= 3072;
-    }
-    catch (CryptographicException) { return false; }
-    catch (ArgumentException) { return false; }
-}
-static string[] SanitizeCapabilities(IReadOnlyList<string>? capabilities) => (capabilities ?? [])
-    .Where(x => !string.IsNullOrWhiteSpace(x) && x.Length <= 64)
-    .Select(x => x.Trim())
-    .Distinct(StringComparer.Ordinal)
-    .OrderBy(x => x, StringComparer.Ordinal)
-    .ToArray();
-
-static IReadOnlyList<RepositoryCircuitTelemetry>? SanitizeRepositoryCircuits(IReadOnlyList<RepositoryCircuitTelemetry>? circuits)
-{
-    if (circuits is null) return null;
-    return circuits.Where(x => ValidIdentifier(x.RepositoryId, 128))
-        .Take(128)
-        .Select(x => new RepositoryCircuitTelemetry(x.RepositoryId, Math.Clamp(x.ConsecutiveFailures, 0, 100000), x.LastFailureAtUtc, x.OpenUntilUtc, string.IsNullOrWhiteSpace(x.LastError) ? null : x.LastError.Length <= 256 ? x.LastError : x.LastError[..256]))
-        .ToArray();
-}
-
-static ProtectionTelemetryDto? SanitizeProtection(ProtectionTelemetryDto? protection)
-{
-    if (protection is null) return null;
-    var status = protection.Status?.Trim().ToLowerInvariant();
-    if (status is not ("healthy" or "locked")) return null;
-    var reason = string.IsNullOrWhiteSpace(protection.Reason) ? null : protection.Reason.Trim();
-    if (reason?.Length > 256) reason = reason[..256];
-    return new ProtectionTelemetryDto(status, reason, protection.TriggeredAtUtc, protection.IncidentId);
-}
