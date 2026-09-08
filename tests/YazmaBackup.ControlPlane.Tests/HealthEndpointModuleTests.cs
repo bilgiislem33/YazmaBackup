@@ -18,10 +18,11 @@ public sealed class HealthEndpointModuleTests
             .SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>()
             .Select(endpoint => endpoint.RoutePattern.RawText)
-            .Where(route => route is not null)
-            .OrderBy(route => route, StringComparer.Ordinal)
+            .Where(static route => route is not null)
+            .Select(static route => route!)
+            .OrderBy(static route => route, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["/health", "/health/live", "/health/ready"], routes);
+        Assert.Equal(new[] { "/health", "/health/live", "/health/ready" }, routes);
     }
 }
