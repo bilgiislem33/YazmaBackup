@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 namespace YazmaBackup.ControlPlane.Tests;
 
 [CollectionDefinition("ControlPlane environment", DisableParallelization = true)]
-public sealed class ControlPlaneEnvironmentCollection;
+public sealed class ControlPlaneEnvironmentFixture;
 
 internal sealed class StateStoreTestScope : IDisposable
 {
