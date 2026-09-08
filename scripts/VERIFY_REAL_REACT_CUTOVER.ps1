@@ -1,9 +1,10 @@
 ﻿$ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'SOURCE_TEXT.ps1')
 $front=Join-Path $root 'src\YazmaBackup.Frontend'
 $cp=Join-Path $root 'src\YazmaBackup.ControlPlane'
 $proj=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $cp 'YazmaBackup.ControlPlane.csproj')
-$program=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $cp 'Program.cs')
+$program=Get-YazmaBackupControlPlaneSource -Area Endpoints
 $build=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'scripts\BUILD_FRONTEND.ps1')
 $deploy=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'scripts\DEPLOY_FRONTEND.ps1')
 
