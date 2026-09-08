@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using YazmaBackup.ControlPlane.Endpoints;
 
 namespace YazmaBackup.ControlPlane.Tests;
@@ -12,6 +13,7 @@ public sealed class HealthEndpointModuleTests
     public void Health_module_registers_only_expected_public_health_routes()
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Services.AddSingleton(new ControlPlaneHaRuntime(Path.GetTempPath(), "single", "test-node", string.Empty));
         var app = builder.Build();
 
         app.MapHealthEndpoints();
