@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using YazmaBackup.Contracts;
 using YazmaBackup.Domain;
 using static YazmaBackup.ControlPlane.Endpoints.EndpointSupport;

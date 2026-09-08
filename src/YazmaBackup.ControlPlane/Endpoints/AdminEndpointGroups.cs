@@ -7,7 +7,9 @@ public sealed record AdminEndpointGroups(
     RouteGroupBuilder Read,
     RouteGroupBuilder Operate,
     RouteGroupBuilder Backup,
-    RouteGroupBuilder Security);
+    RouteGroupBuilder Security,
+    string AdminKey,
+    bool LegacyAdminKeyEnabled);
 
 public static class AdminEndpointGroupExtensions
 {
@@ -33,6 +35,6 @@ public static class AdminEndpointGroupExtensions
         var security = root.MapGroup(string.Empty);
         security.AddEndpointFilter(new PermissionFilter(adminKey, legacyAdminKeyEnabled, ManagementPermissions.SecurityAdministration));
 
-        return new AdminEndpointGroups(root, read, operate, backup, security);
+        return new AdminEndpointGroups(root, read, operate, backup, security, adminKey, legacyAdminKeyEnabled);
     }
 }

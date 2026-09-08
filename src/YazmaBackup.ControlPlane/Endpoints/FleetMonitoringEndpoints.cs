@@ -10,6 +10,8 @@ namespace YazmaBackup.ControlPlane.Endpoints;
 
 internal static class FleetMonitoringEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     internal static AdminEndpointGroups MapFleetMonitoringEndpoints(this AdminEndpointGroups groups)
     {
         ArgumentNullException.ThrowIfNull(groups);
@@ -70,12 +72,12 @@ internal static class FleetMonitoringEndpoints
                     BackupPayload? request = null;
                     if (!string.IsNullOrWhiteSpace(c.PayloadJson))
                     {
-                        try { request = JsonSerializer.Deserialize<BackupPayload>(c.PayloadJson, new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
+                        try { request = JsonSerializer.Deserialize<BackupPayload>(c.PayloadJson, JsonOptions); }
                         catch (JsonException) { }
                     }
                     if (c.Succeeded && !string.IsNullOrWhiteSpace(c.ResultJson))
                     {
-                        try { result = JsonSerializer.Deserialize<BackupResultDto>(c.ResultJson, new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
+                        try { result = JsonSerializer.Deserialize<BackupResultDto>(c.ResultJson, JsonOptions); }
                         catch (JsonException) { }
                     }
                     return new

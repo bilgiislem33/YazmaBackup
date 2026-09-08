@@ -10,6 +10,8 @@ namespace YazmaBackup.ControlPlane.Endpoints;
 
 internal static class AutonomousProtectionEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     internal static AdminEndpointGroups MapAutonomousProtectionEndpoints(this AdminEndpointGroups groups)
     {
         ArgumentNullException.ThrowIfNull(groups);
@@ -82,7 +84,7 @@ internal static class AutonomousProtectionEndpoints
                 BackupPayload? request = null;
                 if (!string.IsNullOrWhiteSpace(command.PayloadJson))
                 {
-                    try { request = JsonSerializer.Deserialize<BackupPayload>(command.PayloadJson, new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
+                    try { request = JsonSerializer.Deserialize<BackupPayload>(command.PayloadJson, JsonOptions); }
                     catch (JsonException) { }
                 }
                 var category = ClassifyBackupError(command.Error);
@@ -169,7 +171,7 @@ internal static class AutonomousProtectionEndpoints
 
         groups.Security.MapPost("/autonomous/remediations/{runId:guid}/approve", async (Guid runId, HttpContext http, AutonomousOrchestrationStore orchestration, CancellationToken ct) =>
         {
-            var actor = ManagementAuthorization.Actor(http, adminKey, legacyAdminKeyEnabled);
+            var actor = ManagementAuthorization.Actor(http, groups.AdminKey, groups.LegacyAdminKeyEnabled);
             var run = await orchestration.UpdateRemediationAsync(runId, x =>
                 x.State == "awaiting-approval"
                     ? x with { State = "approved", ApprovedAtUtc = DateTimeOffset.UtcNow, ApprovedBy = actor, Error = null }

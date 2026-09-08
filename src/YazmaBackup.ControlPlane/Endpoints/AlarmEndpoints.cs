@@ -34,14 +34,14 @@ internal static class AlarmEndpoints
 
         groups.Operate.MapPost("/alarms/{alarmId:guid}/acknowledge", async (Guid alarmId, HttpContext http, IControlPlaneStore store, CancellationToken ct) =>
         {
-            var actor = ManagementAuthorization.Actor(http, adminKey, legacyAdminKeyEnabled);
+            var actor = ManagementAuthorization.Actor(http, groups.AdminKey, groups.LegacyAdminKeyEnabled);
             var alarm = await store.AcknowledgeAlarmAsync(alarmId, actor, DateTimeOffset.UtcNow, ct).ConfigureAwait(false);
             return alarm is null ? Results.NotFound() : Results.Ok(ToAlarmDto(alarm));
         });
 
         groups.Operate.MapPost("/alarms/{alarmId:guid}/workflow", async (Guid alarmId, HttpContext http, UpdateAlarmWorkflowRequest request, IControlPlaneStore store, CancellationToken ct) =>
         {
-            var actor = ManagementAuthorization.Actor(http, adminKey, legacyAdminKeyEnabled);
+            var actor = ManagementAuthorization.Actor(http, groups.AdminKey, groups.LegacyAdminKeyEnabled);
             try
             {
                 var alarm = await store.UpdateAlarmWorkflowAsync(alarmId, request.AssignedTo, request.Note, request.DueAtUtc, actor, DateTimeOffset.UtcNow, ct).ConfigureAwait(false);
@@ -56,7 +56,7 @@ internal static class AlarmEndpoints
             var ids = request.AlarmIds.Distinct().ToArray();
             var action = (request.Action ?? string.Empty).Trim().ToLowerInvariant();
             if (action is not ("acknowledge" or "resolve" or "assign" or "note" or "workflow")) return Results.BadRequest(new { error = "Unsupported bulk alarm action." });
-            var actor = ManagementAuthorization.Actor(http, adminKey, legacyAdminKeyEnabled);
+            var actor = ManagementAuthorization.Actor(http, groups.AdminKey, groups.LegacyAdminKeyEnabled);
             var updated = new List<AlarmDto>();
             foreach (var id in ids)
             {
