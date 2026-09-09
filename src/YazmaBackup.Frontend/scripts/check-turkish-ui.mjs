@@ -54,4 +54,14 @@ for(const invariant of ["Kaydet ve Bağlantıyı Test Et","Kayıtlı Ayarları T
     process.exit(1);
   }
 }
+if(!source.includes("depo bekleme kilidi otomatik kaldırıldı") || !source.includes("Otomatik kilit iyileştirme")){
+  console.error("Başarılı NAS testi sonrası repository circuit iyileştirme açıklaması eksik.");
+  process.exit(1);
+}
+for(const invariant of ["function agentDisplayName(agent:Agent)","assignedUser?.trim()","<OperationsPage agents={agents}/>","Kullanıcı / Bilgisayar","agentDisplayName(a)"]){
+  if(!source.includes(invariant)){
+    console.error("Atanmış kullanıcı adının politika ve operasyon ekranlarına taşınması eksik:",invariant);
+    process.exit(1);
+  }
+}
 console.log("PASS: Merkezi Türkçe arayüz sözlüğü ve enterprise modül dil kapısı.");

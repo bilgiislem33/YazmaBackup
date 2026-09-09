@@ -265,7 +265,11 @@ public sealed class AgentWorker : IDisposable
         var repositoryId = TryGetRepositoryId(command);
         if (repositoryId is null) return await RunCommandCoreAsync(command, cancellationToken).ConfigureAwait(false);
         var now = DateTimeOffset.UtcNow;
-        _repositoryCircuit.ThrowIfOpen(repositoryId, now);
+        // A real NAS access test is the recovery probe for an open circuit. Blocking that
+        // probe would leave a repaired repository unusable until the full backoff expires.
+        // All data operations remain fail-fast while the circuit is open.
+        if (!CanProbeOpenRepositoryCircuit(command.Type))
+            _repositoryCircuit.ThrowIfOpen(repositoryId, now);
         try
         {
             var repositoryRoot = TryGetRepositoryRoot(command);
@@ -283,6 +287,9 @@ public sealed class AgentWorker : IDisposable
             throw;
         }
     }
+
+    private static bool CanProbeOpenRepositoryCircuit(string commandType) =>
+        string.Equals(commandType, "TestNasAccess", StringComparison.Ordinal);
 
     private static (string? SourcePath, string? RepositoryRoot, string? RepositoryId) DescribeCommandContext(AgentCommandDto command)
     {

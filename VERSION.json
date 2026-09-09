@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.4 easy NAS setup: adds labeled guided fields, automatic safe repository identifiers, Agent selection, combined save-and-test, and real NAS read/write result reporting.",
-  "releaseRevision": "r29.4-easy-nas-setup"
+  "notes": "R29.5 repository recovery and owner context: heals an open circuit only after a successful NAS probe and consistently displays assigned user names beside machine names across policies, operations, restore, validation, NAS and lifecycle workflows.",
+  "releaseRevision": "r29.5-repository-recovery-probe"
 }
