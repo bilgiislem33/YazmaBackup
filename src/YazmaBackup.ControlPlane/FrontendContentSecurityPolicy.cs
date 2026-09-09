@@ -6,12 +6,12 @@ namespace YazmaBackup.ControlPlane;
 
 internal static partial class FrontendContentSecurityPolicy
 {
-    internal static string Build(string webRootPath)
+    internal static string Build(string? webRootPath)
     {
         var scriptSources = new List<string> { "'self'" };
 
-        var indexPath = Path.Combine(webRootPath, "index.html");
-        if (File.Exists(indexPath))
+        var indexPath = string.IsNullOrWhiteSpace(webRootPath) ? null : Path.Combine(webRootPath, "index.html");
+        if (indexPath is not null && File.Exists(indexPath))
         {
             var html = File.ReadAllText(indexPath, Encoding.UTF8);
 

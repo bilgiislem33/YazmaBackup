@@ -4,11 +4,11 @@ import {ShieldCheck,LockKeyhole} from "lucide-react";
 import {api} from "@/lib/api";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import type {SessionUser} from "@/lib/types";
+import type {LoginResponse,SessionUser} from "@/lib/types";
 
 export function LoginView({onLogin}:{onLogin:(u:SessionUser)=>void}){
  const [username,setUsername]=useState(""),[password,setPassword]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
- async function submit(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{const u=await api<SessionUser>("/api/v1/session/login",{method:"POST",body:JSON.stringify({username,password})});onLogin(u);}catch{setError("Kullanıcı adı veya parola geçersiz.");}finally{setBusy(false)}}
+ async function submit(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{const response=await api<LoginResponse>("/api/v1/session/login",{method:"POST",body:JSON.stringify({username,password})});onLogin(response.user);}catch{setError("Kullanıcı adı veya parola geçersiz.");}finally{setBusy(false)}}
  return <main className="min-h-screen grid place-items-center p-6">
   <section className="yb-glass yb-shell-shadow w-full max-w-md rounded-3xl border border-white p-8">
    <div className="mb-7 flex items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-900 text-white shadow-lg"><ShieldCheck size={27}/></div><div><div className="text-xl font-black tracking-tight text-slate-900">Yazma<span className="text-blue-600">Backup</span></div><div className="text-xs font-semibold text-slate-400">Enterprise Data Protection</div></div></div>

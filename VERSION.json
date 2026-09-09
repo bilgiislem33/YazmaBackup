@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.2 Turkish UX foundation: centralized UI dictionary, translated enterprise modules and backend status labels, plus a CI localization regression gate.",
-  "releaseRevision": "r29.2-turkish-ux-foundation"
+  "notes": "R29.3 first-login recovery: correctly unwraps login responses, forces the initial password-change view, auto-deploys the frontend for local runs, and prevents CSP failure when webroot is absent.",
+  "releaseRevision": "r29.3-first-login-recovery"
 }

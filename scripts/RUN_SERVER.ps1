@@ -2,6 +2,11 @@
 $root = Split-Path -Parent $PSScriptRoot
 $stateDir = if ([string]::IsNullOrWhiteSpace($env:YAZMABACKUP_STATE_DIR)) { Join-Path $root 'src\YazmaBackup.ControlPlane\.local' } else { $env:YAZMABACKUP_STATE_DIR }
 $env:YAZMABACKUP_STATE_DIR = $stateDir
+$webRoot = Join-Path $root 'src\YazmaBackup.ControlPlane\wwwroot'
+if (-not (Test-Path -LiteralPath (Join-Path $webRoot 'index.html') -PathType Leaf)) {
+    Write-Host 'Frontend bulunamadı; production React arayüzü hazırlanıyor...'
+    & (Join-Path $PSScriptRoot 'DEPLOY_FRONTEND.ps1') -Destination $webRoot
+}
 if ([string]::IsNullOrWhiteSpace($env:YAZMABACKUP_AGENT_PACKAGE_ZIP) -or -not (Test-Path -LiteralPath $env:YAZMABACKUP_AGENT_PACKAGE_ZIP -PathType Leaf)) {
     $agentZip = Get-ChildItem -LiteralPath (Join-Path $root 'dist') -File -Filter 'YazmaBackupAgent_*_win-x64.zip' -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
