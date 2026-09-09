@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.5 repository recovery and owner context: heals an open circuit only after a successful NAS probe and consistently displays assigned user names beside machine names across policies, operations, restore, validation, NAS and lifecycle workflows.",
-  "releaseRevision": "r29.5-repository-recovery-probe"
+  "notes": "R29.6 simplified backup workspace: reduces the primary navigation to seven real backup workflows while retaining advanced engines outside the daily operator menu.",
+  "releaseRevision": "r29.6-simplified-backup-navigation"
 }

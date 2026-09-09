@@ -7,6 +7,7 @@ const login=readFileSync(resolve(root,"components","login-view.tsx"),"utf8");
 const passwordChange=readFileSync(resolve(root,"components","password-change-view.tsx"),"utf8");
 const home=readFileSync(resolve(root,"app","page.tsx"),"utf8");
 const dictionary=readFileSync(resolve(root,"lib","ui-strings.ts"),"utf8");
+const navSource=source.slice(source.indexOf("const nav=["),source.indexOf("];",source.indexOf("const nav=["))+2);
 const forbidden=[
   "Autonomous Safety Policy","Failure Classification Queue","Remediation State Machine",
   "Production Diagnostic Matrix","Executive Protection Brief","Board-Level Protection Status",
@@ -63,5 +64,17 @@ for(const invariant of ["function agentDisplayName(agent:Agent)","assignedUser?.
     console.error("Atanmış kullanıcı adının politika ve operasyon ekranlarına taşınması eksik:",invariant);
     process.exit(1);
   }
+}
+const simpleNavIds=["dashboard","agents","policies","operations","restore","storage","mesh"];
+for(const id of simpleNavIds){
+  if(!navSource.includes(`id:"${id}"`)){
+    console.error("Sade yedekleme menüsünde zorunlu ekran eksik:",id);
+    process.exit(1);
+  }
+}
+const navItemCount=(navSource.match(/\{id:/g)||[]).length;
+if(navItemCount!==simpleNavIds.length){
+  console.error("Sol menü yeniden kalabalıklaştırılmış. Beklenen/Gerçek:",simpleNavIds.length,navItemCount);
+  process.exit(1);
 }
 console.log("PASS: Merkezi Türkçe arayüz sözlüğü ve enterprise modül dil kapısı.");

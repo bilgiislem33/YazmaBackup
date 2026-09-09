@@ -15,35 +15,12 @@ type Page="pilot"|"dashboard"|"commandcenter"|"fleetgalaxy"|"executive"|"intelli
 
 const nav=[
  {id:"dashboard" as Page,label:"Genel Bakış",desc:"Koruma özeti",icon:LayoutDashboard},
- {id:"pilot" as Page,label:"Pilot Merkezi",desc:"Hazırlık · Şablonlar",icon:Play},
- {id:"executive" as Page,label:"Yönetici Özeti",desc:"Yönetici görünümü",icon:BarChart3},
- {id:"commandcenter" as Page,label:"Operasyon Merkezi",desc:"Canlı operasyon · Ağ merkezi",icon:TowerControl},
- {id:"fleetgalaxy" as Page,label:"Filo Görünümü",desc:"Canlı filo · Cihaz 360",icon:Sparkles},
- {id:"intelligence" as Page,label:"Yedekleme Analizi",desc:"Filo sağlığı · Risk önceliği",icon:Activity},
- {id:"autopilot" as Page,label:"Filo Otomatik Pilotu",desc:"Geri yükleme hazırlığı · Çözüm planı",icon:CloudCog},
- {id:"predictive" as Page,label:"Öngörülü Koruma",desc:"Erken uyarı · Hizmet seviyesi tahmini",icon:ShieldCheck},
- {id:"closedloop" as Page,label:"Kapalı Döngü Koruma",desc:"Tespit · Teşhis · Doğrulama",icon:CheckCircle2},
- {id:"recoveryfabric" as Page,label:"Kurtarma Altyapısı",desc:"Kurtarma süresi · Felaket hazırlığı · Kanıt",icon:ArchiveRestore},
- {id:"continuity" as Page,label:"İş Sürekliliği",desc:"İş servisi · Kurtarma sırası",icon:Building2},
- {id:"servicegraph" as Page,label:"Servis Bağımlılıkları",desc:"Bağımlılık · Kurtarma grafiği",icon:Network},
- {id:"drexecution" as Page,label:"Felaket Kurtarma Uygulaması",desc:"Onay · Doğrulama · Sıralı kurtarma",icon:ShieldCheck},
- {id:"reliability" as Page,label:"Güvenilirlik",desc:"Hizmet hedefleri · Teşhis",icon:Activity},
- {id:"autonomous" as Page,label:"Otonom Operasyonlar",desc:"Otomatik düzeltme · Dağıtım koruması",icon:CloudCog},
- {id:"ha" as Page,label:"Yüksek Erişilebilirlik ve FK",desc:"Etkin/Etkin · Geçiş · Felaket kurtarma",icon:ShieldCheck},
- {id:"agents" as Page,label:"Bilgisayarlar",desc:"Korunan cihazlar",icon:Computer},
- {id:"operations" as Page,label:"Operasyonlar",desc:"Komut & görev merkezi",icon:Activity},
- {id:"policies" as Page,label:"Politikalar",desc:"Yedekleme planları",icon:ShieldCheck},
- {id:"restore" as Page,label:"Geri Yükleme",desc:"Kurtarma merkezi",icon:ArchiveRestore},
- {id:"validation" as Page,label:"Doğrulama",desc:"Geri yükleme tatbikatı · Kalite",icon:ShieldCheck},
- {id:"recovery" as Page,label:"Kurtarma",desc:"Kurtarma hazırlığı",icon:ArchiveRestore},
- {id:"storage" as Page,label:"Depolama & NAS",desc:"Repository yönetimi",icon:HardDrive},
- {id:"alarms" as Page,label:"Alarmlar",desc:"Risk & olay görünümü",icon:Activity},
- {id:"lifecycle" as Page,label:"Agent Yaşam Döngüsü",desc:"Sürüm · Kontrollü dağıtım",icon:CloudCog},
- {id:"mesh" as Page,label:"MeshCentral",desc:"Dağıtım bağlantısı",icon:Computer},
- {id:"users" as Page,label:"Kullanıcılar",desc:"Yetkili hesaplar",icon:UsersRound},
- {id:"security" as Page,label:"Güvenlik",desc:"Koruma politikaları",icon:ShieldCheck},
- {id:"audit" as Page,label:"Denetim",desc:"Denetim kayıtları",icon:ArchiveRestore},
- {id:"settings" as Page,label:"Ayarlar",desc:"Sistem & aktarım",icon:Settings},
+ {id:"agents" as Page,label:"Bilgisayarlar",desc:"Bilgisayar ve kullanıcı adları",icon:Computer},
+ {id:"policies" as Page,label:"Yedekleme Oluştur",desc:"Klasör ve zamanlama seçimi",icon:ShieldCheck},
+ {id:"operations" as Page,label:"Yedekleme Geçmişi",desc:"Başarılı ve hatalı yedekler",icon:Activity},
+ {id:"restore" as Page,label:"Geri Yükleme",desc:"Dosya ve klasör kurtarma",icon:ArchiveRestore},
+ {id:"storage" as Page,label:"Depolama & NAS",desc:"NAS ayarı ve bağlantı testi",icon:HardDrive},
+ {id:"mesh" as Page,label:"MeshCentral",desc:"Bilgisayarlara Agent kurulumu",icon:Computer},
 ];
 
 function agentDisplayName(agent:Agent){
@@ -106,7 +83,7 @@ export function Console({user,onLogout}:{user:SessionUser;onLogout:()=>void}){
   {mobile&&<button aria-label="Menüyü kapat" className="fixed inset-0 z-40 bg-slate-950/20 lg:hidden" onClick={()=>setMobile(false)}/>}
   <aside className={cn("yb-glass fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200/80 p-4 transition lg:sticky lg:top-0 lg:h-screen",mobile?"translate-x-0":"-translate-x-full lg:translate-x-0",compact?"w-[92px]":"w-[286px]")}>
    <div className="flex items-center justify-between px-2 py-3"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-900 text-white shadow-lg"><ShieldCheck size={22}/></div><div className={compact?"lg:hidden":""}><div className="font-black tracking-tight">Yazma<span className="text-blue-600">Backup</span></div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-400">Enterprise</div></div></div><button className="lg:hidden" onClick={()=>setMobile(false)}><X size={20}/></button></div>
-   <div className={cn("mt-5 px-2 text-[10px] font-black uppercase tracking-[.16em] text-slate-400",compact&&"lg:hidden")}>Yönetim</div>
+   <div className={cn("mt-5 px-2 text-[10px] font-black uppercase tracking-[.16em] text-slate-400",compact&&"lg:hidden")}>Yedekleme Yönetimi</div>
    <nav className="mt-2 space-y-1">{nav.map(item=>{const Icon=item.icon;const active=page===item.id;return <button key={item.id} onClick={()=>{setPage(item.id);setMobile(false)}} className={cn("group flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",active?"border-blue-100 bg-gradient-to-r from-blue-50 to-white text-blue-900 shadow-sm":"border-transparent text-slate-600 hover:border-slate-200 hover:bg-white")}><span className={cn("grid h-10 w-10 place-items-center rounded-xl",active?"bg-blue-600 text-white shadow-md":"bg-slate-100 text-slate-500")}><Icon size={18}/></span><span className={cn("min-w-0 flex-1",compact&&"lg:hidden")}><b className="block text-sm">{item.label}</b><small className="block truncate text-[11px] text-slate-400">{item.desc}</small></span><ChevronRight size={15} className={cn("transition",active?"text-blue-500":"text-slate-300 group-hover:translate-x-0.5")}/></button>})}</nav>
    <div className={cn("mt-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm",compact&&"lg:px-2")}><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600"><UsersRound size={18}/></div><div className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{user.displayName||user.username}</b><small className="block truncate text-[10px] text-slate-400">{user.roles?.join(", ")||"Yönetici"}</small></div><button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={logout} title="Çıkış"><LogOut size={17}/></button></div></div>
   </aside>
@@ -116,7 +93,7 @@ export function Console({user,onLogout}:{user:SessionUser;onLogout:()=>void}){
     <button className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 lg:hidden" onClick={()=>setMobile(true)}><Menu size={19}/></button>
     <div className="min-w-0 flex-1"><h1 className="truncate text-lg font-black tracking-tight text-slate-900">{nav.find(x=>x.id===page)?.label}</h1><p className="hidden text-xs text-slate-400 sm:block">YazmaBackup modern yönetim konsolu</p></div>
     <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 md:flex"><Search size={15} className="text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bilgisayar veya kullanıcı ara..." className="w-52 border-0 bg-transparent text-xs outline-none"/></div>
-    <Button variant="outline" size="sm" onClick={()=>setCompact(v=>!v)} aria-label="Kenar menüsünü daralt"><PanelLeftClose size={15}/><span className="hidden xl:inline">{compact?"Genişlet":"Daralt"}</span></Button><Button variant="outline" size="sm" onClick={()=>setDensity(v=>v==="comfortable"?"compact":"comfortable")} aria-label="Ekran yoğunluğunu değiştir"><Rows3 size={15}/><span className="hidden xl:inline">{density==="comfortable"?"Kompakt":"Rahat"}</span></Button><Button variant="outline" size="sm" onClick={()=>{setPage("commandcenter");setNoc(v=>!v)}} aria-label="NOC modunu aç"><Maximize2 size={15}/>NOC</Button><Button variant="outline" size="sm" onClick={()=>setPalette(true)} aria-label="Komut paletini aç"><Command size={15}/>Ctrl+K</Button><Button variant="outline" size="sm" onClick={()=>void refresh()} disabled={busy}><RefreshCw size={15} className={busy?"animate-spin":""}/>Yenile</Button>
+    <Button variant="outline" size="sm" onClick={()=>setCompact(v=>!v)} aria-label="Kenar menüsünü daralt"><PanelLeftClose size={15}/><span className="hidden xl:inline">{compact?"Genişlet":"Daralt"}</span></Button><Button variant="outline" size="sm" onClick={()=>setDensity(v=>v==="comfortable"?"compact":"comfortable")} aria-label="Ekran yoğunluğunu değiştir"><Rows3 size={15}/><span className="hidden xl:inline">{density==="comfortable"?"Kompakt":"Rahat"}</span></Button><Button variant="outline" size="sm" onClick={()=>setPalette(true)} aria-label="Hızlı menüyü aç"><Command size={15}/>Hızlı Menü</Button><Button variant="outline" size="sm" onClick={()=>void refresh()} disabled={busy}><RefreshCw size={15} className={busy?"animate-spin":""}/>Yenile</Button>
    </header>
 
    <div id="main-content" tabIndex={-1} className="mx-auto max-w-[1600px] p-4 lg:p-8">
