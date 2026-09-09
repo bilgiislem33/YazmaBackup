@@ -49,6 +49,10 @@ jobs:
         working-directory: src/YazmaBackup.Frontend
         run: npm run typecheck
 
+      - name: Frontend Turkish localization gate
+        working-directory: src/YazmaBackup.Frontend
+        run: npm run localization:check
+
       - name: Frontend production build
         working-directory: src/YazmaBackup.Frontend
         run: npm run build

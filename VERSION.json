@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.1 retention safety: repository-wide mutation lease, recoverable seven-day manifest quarantine, repository-enforced immutability and quarantine-aware chunk/key reference protection.",
-  "releaseRevision": "r29.1-retention-safety"
+  "notes": "R29.2 Turkish UX foundation: centralized UI dictionary, translated enterprise modules and backend status labels, plus a CI localization regression gate.",
+  "releaseRevision": "r29.2-turkish-ux-foundation"
 }

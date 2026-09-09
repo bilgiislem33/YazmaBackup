@@ -7,7 +7,8 @@
     "build": "next build",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run build",
+    "localization:check": "node scripts/check-turkish-ui.mjs",
+    "check": "npm run localization:check && npm run typecheck && npm run build",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
