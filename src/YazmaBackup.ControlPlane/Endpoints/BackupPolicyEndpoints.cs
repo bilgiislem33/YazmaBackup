@@ -102,6 +102,35 @@ internal static class BackupPolicyEndpoints
             catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
+        groups.Backup.MapPost("/policies/multi-source", async (CreateMultiSourceBackupPolicyRequest request, IControlPlaneStore store, CancellationToken ct) =>
+        {
+            var retention = request.Retention ?? new RetentionPolicy();
+            var protection = request.Protection ?? new ProtectionPolicy();
+            if (request.SourcePaths is null || request.SourcePaths.Count is < 1 or > 100 ||
+                request.SourcePaths.Any(path => !ValidPathInput(path)) ||
+                request.SourcePaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != request.SourcePaths.Count)
+                return Results.BadRequest(new { error = "SourcePaths must contain 1..100 unique valid paths." });
+            if (!ValidText(request.Name, 110) || request.IntervalMinutes is < 5 or > 43200 || request.RestoreDrillIntervalDays is < 1 or > 365 || request.RepositoryHealthIntervalHours is < 1 or > 720)
+                return Results.BadRequest(new { error = "Policy name, backup interval or restore drill interval is invalid." });
+            if (!ValidBackupRequest(request.SourcePaths[0], request.RepositoryRoot, request.RepositoryId, request.ActiveBytesPerSecond, request.IdleBytesPerSecond, request.UserIdleThresholdSeconds, retention, protection, out var error))
+                return Results.BadRequest(new { error });
+
+            var now = DateTimeOffset.UtcNow;
+            var policies = request.SourcePaths.Select((sourcePath, index) => new BackupPolicyRecord(
+                Guid.NewGuid(), request.SourcePaths.Count == 1 ? request.Name.Trim() : $"{request.Name.Trim()} · {index + 1}", request.AgentId, sourcePath,
+                request.RepositoryRoot, request.RepositoryId, request.RequireSnapshot, request.IntervalMinutes, request.ActiveBytesPerSecond,
+                request.IdleBytesPerSecond, request.UserIdleThresholdSeconds, retention, request.Enabled, now, null, now, protection,
+                request.RestoreDrillIntervalDays, null, now.AddDays(request.RestoreDrillIntervalDays), request.RepositoryHealthIntervalHours, null, now)).ToArray();
+            try
+            {
+                var created = await store.CreateBackupPoliciesAsync(policies, ct).ConfigureAwait(false);
+                return Results.Ok(new CreateMultiSourceBackupPolicyResultDto(created.Count, created.Select(ToPolicyDto).ToArray()));
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(new { error = "Agent not found. No policies were created." }); }
+            catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
+        });
+
         groups.Read.MapGet("/policies", async (IControlPlaneStore store, CancellationToken ct) =>
         {
             var policies = await store.GetBackupPoliciesAsync(ct).ConfigureAwait(false);

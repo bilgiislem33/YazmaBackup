@@ -113,6 +113,7 @@ POST /api/v1/admin/meshcentral/test
 POST /api/v1/admin/nas/global-profile
 POST /api/v1/admin/notification-routes
 POST /api/v1/admin/policies
+POST /api/v1/admin/policies/multi-source
 POST /api/v1/admin/policies/{policyId:guid}/enabled
 POST /api/v1/admin/policy-templates/{templateId}/apply
 POST /api/v1/admin/policy-templates/{templateId}/apply-bulk

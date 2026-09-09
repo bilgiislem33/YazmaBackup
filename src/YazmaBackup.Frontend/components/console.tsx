@@ -671,21 +671,35 @@ function AgentsPage({agents}:{agents:Agent[]}){
 
 function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
  const [rows,setRows]=useState<Policy[]>(policies),[open,setOpen]=useState(false),[status,setStatus]=useState(""),[busy,setBusy]=useState("");
- const [name,setName]=useState(""),[agentId,setAgentId]=useState(agents[0]?.agentId??""),[sourcePath,setSourcePath]=useState(""),[repositoryRoot,setRepositoryRoot]=useState(""),[repositoryId,setRepositoryId]=useState(""),[intervalMinutes,setIntervalMinutes]=useState(60),[requireSnapshot,setRequireSnapshot]=useState(true);
+ type BrowseEntry={name:string;fullPath:string;isDirectory:boolean;length?:number|null;lastWriteTimeUtc?:string};
+ type BrowseResult={path:string;entries:BrowseEntry[]};
+ const [name,setName]=useState(""),[agentId,setAgentId]=useState(agents[0]?.agentId??""),[sourcePaths,setSourcePaths]=useState<string[]>([]),[repositoryRoot,setRepositoryRoot]=useState(""),[repositoryId,setRepositoryId]=useState(""),[intervalMinutes,setIntervalMinutes]=useState(60),[requireSnapshot,setRequireSnapshot]=useState(true);
+ const [browserOpen,setBrowserOpen]=useState(false),[browsePath,setBrowsePath]=useState("::drives"),[browseEntries,setBrowseEntries]=useState<BrowseEntry[]>([]);
  useEffect(()=>setRows(policies),[policies]);
  useEffect(()=>{if(!agentId&&agents[0])setAgentId(agents[0].agentId)},[agents,agentId]);
  const names=new Map(agents.map(a=>[a.agentId,a.machineName]));
  async function refresh(){setRows(await api<Policy[]>("/api/v1/admin/policies"))}
+ async function browse(path:string){
+  if(!agentId){setStatus("Önce bilgisayar seçin.");return}
+  setBusy("browse");setStatus("");
+  try{
+   const q=await api<Enqueue>("/api/v1/admin/agents/"+agentId+"/browse",{method:"POST",body:JSON.stringify({path})});
+   const r=await pollCommandResult<BrowseResult>(q.commandId);
+   setBrowsePath(r.path);setBrowseEntries((r.entries||[]).filter(x=>x.isDirectory));setBrowserOpen(true);
+  }catch(e){setStatus(e instanceof Error?e.message:"Klasörler okunamadı.")}finally{setBusy("")}
+ }
+ function toggleSource(path:string){setSourcePaths(v=>v.some(x=>x.toLocaleLowerCase()===path.toLocaleLowerCase())?v.filter(x=>x.toLocaleLowerCase()!==path.toLocaleLowerCase()):[...v,path])}
+ function parentPath(path:string){if(path==="::drives")return "::drives";const normalized=path.replace(/[\\/]+$/,"");if(/^[A-Za-z]:$/.test(normalized))return "::drives";const cut=Math.max(normalized.lastIndexOf("\\"),normalized.lastIndexOf("/"));return cut<=2?normalized.slice(0,3):normalized.slice(0,cut)}
  async function createPolicy(){
-  if(!name.trim()||!agentId||!sourcePath.trim()||!repositoryRoot.trim()||!repositoryId.trim()){setStatus("Ad, bilgisayar, kaynak, repository root ve repository ID zorunlu.");return}
+  if(!name.trim()||!agentId||sourcePaths.length===0||!repositoryRoot.trim()||!repositoryId.trim()){setStatus("Ad, bilgisayar, en az bir kaynak klasör, repository root ve repository ID zorunlu.");return}
   setBusy("create");
   try{
-   await api("/api/v1/admin/policies",{method:"POST",body:JSON.stringify({
-    name:name.trim(),agentId,sourcePath:sourcePath.trim(),repositoryRoot:repositoryRoot.trim(),repositoryId:repositoryId.trim(),
-    requireSnapshot,intervalMinutes,activeBytesPerSecond:2097152,idleBytesPerSecond:0,userIdleThresholdSeconds:300,
-    retention:null,protection:null,enabled:true,restoreDrillIntervalDays:7,repositoryHealthIntervalHours:24
-   })});
-   setStatus("Yedekleme politikası oluşturuldu.");setName("");setSourcePath("");setOpen(false);await refresh();
+   const result=await api<{createdCount:number}>("/api/v1/admin/policies/multi-source",{method:"POST",body:JSON.stringify({
+     name:name.trim(),agentId,sourcePaths,repositoryRoot:repositoryRoot.trim(),repositoryId:repositoryId.trim(),
+     requireSnapshot,intervalMinutes,activeBytesPerSecond:2097152,idleBytesPerSecond:0,userIdleThresholdSeconds:300,
+     retention:null,protection:null,enabled:true,restoreDrillIntervalDays:7,repositoryHealthIntervalHours:24
+    })});
+   setStatus(`${result.createdCount} kaynak klasör için yedekleme politikası atomik olarak oluşturuldu.`);setName("");setSourcePaths([]);setBrowserOpen(false);setOpen(false);await refresh();
   }catch(e){setStatus(e instanceof Error?e.message:"Politika oluşturulamadı.")}finally{setBusy("")}
  }
  async function toggle(p:Policy){setBusy(p.policyId);try{await api("/api/v1/admin/policies/"+p.policyId+"/enabled",{method:"POST",body:JSON.stringify({enabled:!p.enabled})});await refresh()}finally{setBusy("")}}
@@ -694,8 +708,12 @@ function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
  <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div className="text-xs text-slate-500">{rows.length} politika · {rows.filter(p=>p.enabled).length} aktif</div><Button onClick={()=>setOpen(!open)}><ShieldCheck size={16}/>{open?"Formu Kapat":"Yeni Politika"}</Button></div>
  {open&&<Card className="mb-6"><CardHeader><div><CardTitle>Yeni Yedekleme Politikası</CardTitle><CardDescription>Mevcut backend doğrulamalarını kullanan production form.</CardDescription></div></CardHeader><CardContent className="grid gap-4 lg:grid-cols-2">
   <Input value={name} onChange={e=>setName(e.target.value)} placeholder="Politika adı"/>
-  <select value={agentId} onChange={e=>setAgentId(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">{agents.map(a=><option key={a.agentId} value={a.agentId}>{a.machineName}</option>)}</select>
-  <Input value={sourcePath} onChange={e=>setSourcePath(e.target.value)} placeholder="Kaynak yol, örn. C:\Users\..."/>
+  <select value={agentId} onChange={e=>{setAgentId(e.target.value);setSourcePaths([]);setBrowserOpen(false)}} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">{agents.map(a=><option key={a.agentId} value={a.agentId}>{a.machineName}</option>)}</select>
+  <div className="rounded-xl border border-slate-200 p-3 lg:col-span-2">
+   <div className="flex flex-wrap items-center justify-between gap-2"><div><b className="block text-xs text-slate-700">Kaynak klasörler</b><small className="text-[10px] text-slate-400">Yol yazmadan Agent üzerindeki bir veya daha fazla klasörü seçin.</small></div><Button type="button" variant="outline" onClick={()=>void browse(browserOpen?browsePath:"::drives")} disabled={busy==="browse"}>{busy==="browse"?"Klasörler okunuyor...":"Klasör Seç"}</Button></div>
+   {sourcePaths.length>0&&<div className="mt-3 flex flex-wrap gap-2">{sourcePaths.map(path=><span key={path} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700"><span className="truncate">{path}</span><button type="button" aria-label={path+" seçimini kaldır"} onClick={()=>toggleSource(path)}><X size={13}/></button></span>)}</div>}
+   {browserOpen&&<div className="mt-3 overflow-hidden rounded-xl border border-slate-200"><div className="flex items-center gap-2 border-b bg-slate-50 p-2"><Button type="button" size="sm" variant="ghost" disabled={browsePath==="::drives"||busy==="browse"} onClick={()=>void browse(parentPath(browsePath))}>Üst Klasör</Button><span className="min-w-0 flex-1 truncate text-xs text-slate-500">{browsePath==="::drives"?"Sürücüler":browsePath}</span>{browsePath!=="::drives"&&<Button type="button" size="sm" onClick={()=>toggleSource(browsePath)}>{sourcePaths.some(x=>x.toLocaleLowerCase()===browsePath.toLocaleLowerCase())?"Seçimi Kaldır":"Bu Klasörü Seç"}</Button>}</div><div className="max-h-72 overflow-auto">{browseEntries.map(entry=><div key={entry.fullPath} className="flex items-center gap-2 border-b border-slate-100 p-2 last:border-0"><input type="checkbox" aria-label={entry.name+" klasörünü seç"} checked={sourcePaths.some(x=>x.toLocaleLowerCase()===entry.fullPath.toLocaleLowerCase())} onChange={()=>toggleSource(entry.fullPath)}/><button type="button" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs hover:bg-slate-50" onClick={()=>void browse(entry.fullPath)}><HardDrive size={15} className="shrink-0 text-slate-400"/><span className="truncate">{entry.name}</span><ChevronRight size={14} className="ml-auto shrink-0 text-slate-300"/></button></div>)}{browseEntries.length===0&&<div className="p-6 text-center text-xs text-slate-400">Alt klasör bulunamadı. Bu klasörü seçebilirsiniz.</div>}</div></div>}
+  </div>
   <Input value={repositoryRoot} onChange={e=>setRepositoryRoot(e.target.value)} placeholder="Repository root, örn. \\NAS\PC_Yedek"/>
   <Input value={repositoryId} onChange={e=>setRepositoryId(e.target.value)} placeholder="Repository ID"/>
   <Input type="number" min={5} value={intervalMinutes} onChange={e=>setIntervalMinutes(Number(e.target.value))} placeholder="Dakika"/>

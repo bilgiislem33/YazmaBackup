@@ -105,6 +105,23 @@ public sealed record CreateBackupPolicyRequest(
     bool Enabled = true,
     int RestoreDrillIntervalDays = 7,
     int RepositoryHealthIntervalHours = 24);
+public sealed record CreateMultiSourceBackupPolicyRequest(
+    string Name,
+    Guid AgentId,
+    IReadOnlyList<string> SourcePaths,
+    string RepositoryRoot,
+    string RepositoryId,
+    bool RequireSnapshot = true,
+    int IntervalMinutes = 60,
+    long ActiveBytesPerSecond = 2 * 1024 * 1024,
+    long IdleBytesPerSecond = 0,
+    int UserIdleThresholdSeconds = 300,
+    RetentionPolicy? Retention = null,
+    ProtectionPolicy? Protection = null,
+    bool Enabled = true,
+    int RestoreDrillIntervalDays = 7,
+    int RepositoryHealthIntervalHours = 24);
+public sealed record CreateMultiSourceBackupPolicyResultDto(int CreatedCount, IReadOnlyList<BackupPolicyDto> Policies);
 public sealed record BackupPolicyDto(Guid PolicyId, string Name, Guid AgentId, string SourcePath, string RepositoryRoot, string RepositoryId, bool RequireSnapshot, int IntervalMinutes, long ActiveBytesPerSecond, long IdleBytesPerSecond, int UserIdleThresholdSeconds, RetentionPolicy Retention, ProtectionPolicy Protection, bool Enabled, DateTimeOffset? LastScheduledAtUtc, DateTimeOffset NextRunAtUtc, int RestoreDrillIntervalDays, DateTimeOffset? LastRestoreDrillScheduledAtUtc, DateTimeOffset? NextRestoreDrillAtUtc, int RepositoryHealthIntervalHours, DateTimeOffset? LastRepositoryHealthScheduledAtUtc, DateTimeOffset? NextRepositoryHealthAtUtc);
 public sealed record SetPolicyEnabledRequest(bool Enabled);
 

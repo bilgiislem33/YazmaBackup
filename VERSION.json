@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.3 first-login recovery: correctly unwraps login responses, forces the initial password-change view, auto-deploys the frontend for local runs, and prevents CSP failure when webroot is absent.",
-  "releaseRevision": "r29.3-first-login-recovery"
+  "notes": "R29.3.1 multi-source picker: browses the selected Agent's real drives and folders, supports checkbox-based multiple source selection, and creates all source policies atomically.",
+  "releaseRevision": "r29.3.1-multi-source-picker"
 }

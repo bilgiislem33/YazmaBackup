@@ -38,4 +38,10 @@ for(const invariant of [[login,"response.user"],[home,"user.mustChangePassword"]
     process.exit(1);
   }
 }
+for(const invariant of ["/api/v1/admin/agents/","/browse","pollCommandResult<BrowseResult>","sourcePaths","/api/v1/admin/policies/multi-source","Bu Klasörü Seç"]){
+  if(!source.includes(invariant)){
+    console.error("Çoklu kaynak klasör seçimi akışı eksik:",invariant);
+    process.exit(1);
+  }
+}
 console.log("PASS: Merkezi Türkçe arayüz sözlüğü ve enterprise modül dil kapısı.");
