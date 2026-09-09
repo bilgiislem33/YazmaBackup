@@ -249,7 +249,7 @@ try {
     foreach($required in @('Stage = null','LogicalBytesProcessed','LogicalBytesTotal','FilesProcessed','FilesTotal','ListRestoreEntriesPayload','ListRestoreEntriesResultDto')){if($contracts -notmatch [Regex]::Escape($required)){throw "R5.19 telemetry/restore explorer contract eksik: $required"}}
     foreach($required in @('UpdateAlarmWorkflowRequest','BulkAlarmActionRequest','AssignedTo','OperatorNote','DueAtUtc')){if(($enterpriseContracts + (Get-Content .\src\YazmaBackup.Domain\EnterpriseControlModels.cs -Raw)) -notmatch [Regex]::Escape($required)){throw "R5.19 alarm workflow contract eksik: $required"}}
     foreach($required in @('restore-entries','/alarms/bulk','/alarms/{alarmId:guid}/workflow')){if($program -notmatch [Regex]::Escape($required)){throw "R5.19 API invariant eksik: $required"}}
-    foreach($required in @('CommandCenterPage','Device 360','restore-entries','AlarmsPage')){if(-not $frontendConsole.Contains($required)){throw "React Functional UI invariant eksik: $required"}}
+    foreach($required in @('CommandCenterPage','uiText.fleet.device360','restore-entries','AlarmsPage')){if(-not $frontendConsole.Contains($required)){throw "React Functional UI invariant eksik: $required"}}
 
     Write-Host '[12e/23] Secure NAS credential / SMB access test invariantları'
     $nasAgent = Get-Content -Raw -LiteralPath (Join-Path $root 'src\YazmaBackup.Agent\NasCredentialStore.cs')
