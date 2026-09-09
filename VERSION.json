@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.3.2 multi-source build repair: promotes the Agent enqueue response contract to shared frontend scope and locks the folder picker against out-of-scope TypeScript types.",
-  "releaseRevision": "r29.3.2-multi-source-build-repair"
+  "notes": "R29.4 easy NAS setup: adds labeled guided fields, automatic safe repository identifiers, Agent selection, combined save-and-test, and real NAS read/write result reporting.",
+  "releaseRevision": "r29.4-easy-nas-setup"
 }

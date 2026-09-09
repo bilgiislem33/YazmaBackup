@@ -48,4 +48,10 @@ if(!source.includes("type EnqueueResponse={commandId:string}") || source.include
   console.error("Agent komut yanıt tipi ortak kapsamda değil veya eski kapsam-dışı Enqueue kullanımı kaldı.");
   process.exit(1);
 }
+for(const invariant of ["Kaydet ve Bağlantıyı Test Et","Kayıtlı Ayarları Test Et","/nas-access-test","pollCommandResult<NasTestResult>","directoryReadable","writeProbeSucceeded","Sistem kimliği:"]){
+  if(!source.includes(invariant)){
+    console.error("Kolay NAS kurulumu veya gerçek bağlantı testi eksik:",invariant);
+    process.exit(1);
+  }
+}
 console.log("PASS: Merkezi Türkçe arayüz sözlüğü ve enterprise modül dil kapısı.");

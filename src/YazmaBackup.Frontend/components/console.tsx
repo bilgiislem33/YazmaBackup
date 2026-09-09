@@ -726,19 +726,57 @@ function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
 }
 
 function StoragePage({nas}:{nas:NasProfile|null}){
- const [profile,setProfile]=useState<NasProfile|null>(nas),[repositoryId,setRepositoryId]=useState(nas?.repositoryId??""),[repositoryRoot,setRepositoryRoot]=useState(nas?.repositoryRoot??""),[username,setUsername]=useState(nas?.username??""),[password,setPassword]=useState(""),[status,setStatus]=useState(""),[busy,setBusy]=useState(false);
+ type NasTestResult={succeeded:boolean;repositoryId:string;repositoryRoot:string;credentialConfigured:boolean;directoryReadable:boolean;writeProbeSucceeded:boolean;message:string};
+ const [profile,setProfile]=useState<NasProfile|null>(nas),[repositoryId,setRepositoryId]=useState(nas?.repositoryId??""),[repositoryRoot,setRepositoryRoot]=useState(nas?.repositoryRoot??""),[username,setUsername]=useState(nas?.username??""),[password,setPassword]=useState(""),[status,setStatus]=useState(""),[busy,setBusy]=useState("");
+ const [agents,setAgents]=useState<Agent[]>([]),[testAgentId,setTestAgentId]=useState(""),[testResult,setTestResult]=useState<NasTestResult|null>(null);
  useEffect(()=>{setProfile(nas);if(nas){setRepositoryId(nas.repositoryId);setRepositoryRoot(nas.repositoryRoot);setUsername(nas.username)}},[nas]);
- async function saveGlobal(){
-  if(!repositoryId.trim()||!repositoryRoot.trim()||!username.trim()){setStatus("Repository ID, NAS yolu ve kullanıcı adı zorunlu.");return}
-  setBusy(true);setStatus("");
-  try{
-   const r=await api<Record<string,unknown>>("/api/v1/admin/nas/global-profile",{method:"POST",body:JSON.stringify({repositoryId:repositoryId.trim(),repositoryRoot:repositoryRoot.trim(),username:username.trim(),password:password||null})});
-   setPassword("");setStatus("Global NAS profili kaydedildi ve mevcut bilgisayarlara uygulanmak üzere kuyruğa alındı. "+(r.passwordReused===true?"Mevcut parola yeniden kullanıldı.":"Parola güncellendi."));
-   const p=await api<NasProfile>("/api/v1/admin/nas/global-profile");setProfile(p);
-  }catch(e){setStatus(e instanceof Error?e.message:"Global NAS profili kaydedilemedi.")}finally{setBusy(false)}
+ useEffect(()=>{api<Agent[]>("/api/v1/admin/agents").then(x=>{setAgents(x);if(x[0])setTestAgentId(x[0].agentId)}).catch(()=>{})},[]);
+ const normalizedId=repositoryId.trim().replace(/\s+/g,"-").replace(/[^\p{L}\p{N}._-]/gu,"-").replace(/-+/g,"-");
+ const uncValid=/^\\\\[^\\]+\\[^\\]+/.test(repositoryRoot.trim());
+ const formValid=!!normalizedId&&uncValid&&!!username.trim()&&(!!password||!!profile?.passwordConfigured);
+ function validate(){
+  if(!normalizedId){setStatus("Depo adı zorunludur. Örnek: Merkez NAS");return false}
+  if(!uncValid){setStatus("NAS klasörü geçerli bir ağ yolu olmalıdır. Örnek: \\\\10.218.177.33\\PC_Yedek");return false}
+  if(!username.trim()){setStatus("NAS kullanıcı adı zorunludur.");return false}
+  if(!password&&!profile?.passwordConfigured){setStatus("İlk kurulumda NAS parolası zorunludur.");return false}
+  return true
  }
- return <><PageHero eyebrow="Storage Fabric" title="Depolama & NAS" desc="Global NAS profilini bir kez kaydedin; parola yalnızca değiştiğinde girilir ve profil tüm Agent'lara otomatik uygulanır." icon={HardDrive}/><div className="grid gap-6 xl:grid-cols-[1fr_.8fr]"><Card><CardHeader><div><CardTitle>Global NAS Profili</CardTitle><CardDescription>R6.9 kalıcı profil ve versioned auto-apply akışının React yönetim formu.</CardDescription></div><Badge tone={profile?.passwordConfigured?"success":"warning"}>{profile?.passwordConfigured?"Kimlik yapılandırıldı":"Parola bekleniyor"}</Badge></CardHeader><CardContent className="space-y-4"><Input value={repositoryId} onChange={e=>setRepositoryId(e.target.value)} placeholder="Repository ID"/><Input value={repositoryRoot} onChange={e=>setRepositoryRoot(e.target.value)} placeholder="\\\\10.218.177.33\\PC_Yedek\\"/><Input value={username} onChange={e=>setUsername(e.target.value)} placeholder="NAS kullanıcı adı"/><Input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder={profile?.passwordConfigured?"Değişmediyse boş bırakın":"NAS parolası"}/><Button onClick={()=>void saveGlobal()} disabled={busy}>Global Ayarları Kaydet ve Tüm Bilgisayarlara Uygula</Button>{status&&<div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">{status}</div>}</CardContent></Card><Card><CardHeader><div><CardTitle>Repository güvenliği</CardTitle><CardDescription>Mevcut güvenlik zinciri aynen korunur.</CardDescription></div><CloudCog size={20} className="text-blue-500"/></CardHeader><CardContent className="space-y-3"><SecureLine title="Control Plane" text="Data Protection ile korunan global NAS profili"/><SecureLine title="Aktarım" text="Agent RSA-OAEP-SHA256 anahtar sarmalama"/><SecureLine title="Endpoint" text="Windows DPAPI LocalMachine saklama"/><SecureLine title="Repository Key" text="Otomatik provision + tek seferlik self-heal"/></CardContent></Card></div><div className="mt-6"><LiveDataPage eyebrow="Repository Telemetry" title="Repository Sağlığı" desc="Kapasite, büyüme ve restore point sağlığını gerçek repository-health kayıtlarından izleyin." icon={HardDrive} endpoint="/api/v1/admin/repository-health?limit=100"/></div></>
+ async function persistGlobal(){
+  if(!validate())return null;
+  const r=await api<{profile:NasProfile;queuedAgents:number;skippedAgents:number;passwordReused:boolean}>("/api/v1/admin/nas/global-profile",{method:"POST",body:JSON.stringify({repositoryId:normalizedId,repositoryRoot:repositoryRoot.trim(),username:username.trim(),password:password||null})});
+  setRepositoryId(normalizedId);setPassword("");setProfile(r.profile);
+  return r
+ }
+ async function saveGlobal(){
+  setBusy("save");setStatus("");setTestResult(null);
+  try{
+   const r=await persistGlobal();if(r)setStatus(`NAS ayarları kaydedildi. ${r.queuedAgents} bilgisayara uygulama komutu gönderildi${r.skippedAgents?`; ${r.skippedAgents} bilgisayar anahtar eksikliği nedeniyle atlandı`:""}.`)
+  }catch(e){setStatus(e instanceof Error?e.message:"NAS ayarları kaydedilemedi.")}finally{setBusy("")}
+ }
+ async function testAccess(saveFirst=false){
+  if(!testAgentId){setStatus("Bağlantı testi için çevrimiçi bir bilgisayar seçin.");return}
+  setBusy("test");setStatus("");setTestResult(null);
+  try{
+   if(saveFirst){const saved=await persistGlobal();if(!saved)return}
+   else if(!validate())return;
+   const q=await api<EnqueueResponse>("/api/v1/admin/agents/"+testAgentId+"/nas-access-test",{method:"POST",body:JSON.stringify({repositoryRoot:repositoryRoot.trim(),repositoryId:normalizedId})});
+   setStatus("NAS bağlantısı seçili bilgisayarda deneniyor…");
+   const result=await pollCommandResult<NasTestResult>(q.commandId,90000);setTestResult(result);
+   setStatus(result.succeeded?"NAS bağlantı testi başarılı. Klasör okundu ve güvenli yazma denemesi tamamlandı.":result.message||"NAS bağlantı testi başarısız.");
+  }catch(e){setStatus(e instanceof Error?e.message:"NAS bağlantı testi tamamlanamadı.")}finally{setBusy("")}
+ }
+ return <><PageHero eyebrow="Kolay NAS Kurulumu" title="Depolama ve NAS" desc="Ağ klasörünü tanımlayın, bir bilgisayar seçin ve gerçek okuma-yazma testiyle bağlantıyı doğrulayın." icon={HardDrive}/><div className="grid gap-6 xl:grid-cols-[1.15fr_.85fr]"><Card><CardHeader><div><CardTitle>NAS Bağlantı Ayarları</CardTitle><CardDescription>Dört alanı doldurun. Ayarlar tüm bilgisayarlara güvenli biçimde gönderilir.</CardDescription></div><Badge tone={profile?.passwordConfigured?"success":"warning"}>{profile?.passwordConfigured?"Parola kayıtlı":"Parola gerekli"}</Badge></CardHeader><CardContent className="space-y-4">
+  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Depo adı</span><Input value={repositoryId} onChange={e=>setRepositoryId(e.target.value)} placeholder="Merkez NAS"/><small className="mt-1 block text-[11px] text-slate-400">Kolay tanınan bir ad yazın. Sistem kimliği: <b>{normalizedId||"—"}</b></small></label>
+  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">NAS paylaşım yolu</span><Input value={repositoryRoot} onChange={e=>setRepositoryRoot(e.target.value)} placeholder="\\\\10.218.177.33\\PC_Yedek"/><small className={cn("mt-1 block text-[11px]",repositoryRoot&&!uncValid?"text-rose-600":"text-slate-400")}>{repositoryRoot&&!uncValid?"Yol iki ters eğik çizgiyle başlamalı ve paylaşım adını içermelidir.":"Örnek: \\\\10.218.177.33\\PC_Yedek"}</small></label>
+  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">NAS kullanıcı adı</span><Input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Örnek: backup veya SUNUCU\\backup"/></label>
+  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">NAS parolası</span><Input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder={profile?.passwordConfigured?"Değişmeyecekse boş bırakın":"NAS parolasını yazın"}/><small className="mt-1 block text-[11px] text-slate-400">{profile?.passwordConfigured?"Kayıtlı parola korunuyor; yalnız değiştirmek için yeniden yazın.":"Parola şifreli saklanır ve ilk kayıtta zorunludur."}</small></label>
+  <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3"><label className="text-xs font-bold text-blue-900">Testi yapacak bilgisayar</label><select value={testAgentId} onChange={e=>setTestAgentId(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-blue-200 bg-white px-3 text-sm"><option value="">Bilgisayar seçin</option>{agents.map(a=><option key={a.agentId} value={a.agentId}>{a.machineName}</option>)}</select><small className="mt-1 block text-[11px] text-blue-700">NAS'a erişmesi gereken çevrimiçi bir bilgisayar seçin.</small></div>
+  <div className="flex flex-wrap gap-2"><Button onClick={()=>void testAccess(true)} disabled={!!busy||!formValid}>{busy==="test"?"Bağlantı deneniyor…":"Kaydet ve Bağlantıyı Test Et"}</Button><Button variant="outline" onClick={()=>void saveGlobal()} disabled={!!busy||!formValid}>{busy==="save"?"Kaydediliyor…":"Yalnızca Kaydet ve Uygula"}</Button>{profile&&<Button variant="ghost" onClick={()=>void testAccess(false)} disabled={!!busy||!testAgentId}>Kayıtlı Ayarları Test Et</Button>}</div>
+  {status&&<div className={cn("rounded-xl border p-3 text-xs",testResult?.succeeded?"border-emerald-200 bg-emerald-50 text-emerald-800":testResult&&!testResult.succeeded?"border-rose-200 bg-rose-50 text-rose-700":"border-slate-200 bg-slate-50 text-slate-600")}>{status}</div>}
+ </CardContent></Card><Card><CardHeader><div><CardTitle>Bağlantı Testi Sonucu</CardTitle><CardDescription>Biçim kontrolü değil, seçili bilgisayardan gerçek NAS testi.</CardDescription></div>{testResult&&<Badge tone={testResult.succeeded?"success":"danger"}>{testResult.succeeded?"Başarılı":"Başarısız"}</Badge>}</CardHeader><CardContent className="space-y-3">{testResult?<><TestLine label="Kimlik bilgisi" ok={testResult.credentialConfigured}/><TestLine label="Klasör okunabiliyor" ok={testResult.directoryReadable}/><TestLine label="Dosya yazma/silme denemesi" ok={testResult.writeProbeSucceeded}/><div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">{testResult.message}</div></>:<div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center"><HardDrive className="mx-auto text-slate-300"/><b className="mt-3 block text-sm text-slate-700">Henüz test yapılmadı</b><p className="mt-1 text-xs text-slate-400">Ayarları doldurup “Kaydet ve Bağlantıyı Test Et” düğmesine basın.</p></div>}<SecureLine title="Parola güvenliği" text="Parola şifreli saklanır; tarayıcıya geri gönderilmez."/><SecureLine title="Gerçek doğrulama" text="Agent klasörü okur ve geçici dosya ile yazma yetkisini sınar."/></CardContent></Card></div><div className="mt-6"><LiveDataPage eyebrow="Depolama İzleme" title="Depo Sağlığı" desc="Kapasite, büyüme ve geri yükleme noktası sağlığını izleyin." icon={HardDrive} endpoint="/api/v1/admin/repository-health?limit=100"/></div></>
 }
+
+function TestLine({label,ok}:{label:string;ok:boolean}){return <div className={cn("flex items-center justify-between rounded-xl border p-3 text-xs",ok?"border-emerald-200 bg-emerald-50 text-emerald-800":"border-rose-200 bg-rose-50 text-rose-700")}><b>{label}</b><span>{ok?"Başarılı":"Başarısız"}</span></div>}
 
 function Info({label,value}:{label:string;value:string}){return <div className="rounded-xl border border-slate-100 bg-slate-50 p-4"><span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</span><b className="mt-1 block break-all text-sm text-slate-800">{value||"—"}</b></div>}
 function SecureLine({title,text}:{title:string;text:string}){return <div className="flex gap-3 rounded-xl border border-slate-100 p-3"><div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600"><ShieldCheck size={15}/></div><div><b className="block text-xs text-slate-800">{title}</b><span className="text-xs text-slate-500">{text}</span></div></div>}
