@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.6 simplified backup workspace: reduces the primary navigation to seven real backup workflows while retaining advanced engines outside the daily operator menu.",
-  "releaseRevision": "r29.6-simplified-backup-navigation"
+  "notes": "R29.7 identity-aware backup targeting: fixes assigned-name persistence, propagates it immediately across workflows, inherits the global NAS profile in policy creation, and enforces a safe per-owner repository folder server-side.",
+  "releaseRevision": "r29.7-identity-aware-backup-targeting"
 }

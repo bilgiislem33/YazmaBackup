@@ -77,4 +77,10 @@ if(navItemCount!==simpleNavIds.length){
   console.error("Sol menü yeniden kalabalıklaştırılmış. Beklenen/Gerçek:",simpleNavIds.length,navItemCount);
   process.exit(1);
 }
+for(const invariant of ["assigned-user\",{method:\"PUT\"","onAgentUpdated(updated)","onNasUpdated(r.profile)","agentRepositoryRoot(nas.repositoryRoot,agent)","Otomatik yedekleme hedefi","value={repositoryRoot} readOnly","önce Depolama & NAS ekranında"]){
+  if(!source.includes(invariant)){
+    console.error("Kalıcı bilgisayar adı veya otomatik kişi bazlı NAS hedefi eksik:",invariant);
+    process.exit(1);
+  }
+}
 console.log("PASS: Merkezi Türkçe arayüz sözlüğü ve enterprise modül dil kapısı.");

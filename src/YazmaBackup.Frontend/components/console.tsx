@@ -28,6 +28,17 @@ function agentDisplayName(agent:Agent){
  return owner?`${owner} · ${agent.machineName}`:agent.machineName;
 }
 
+function safeBackupFolderName(agent:Agent){
+ const preferred=agent.assignedUser?.trim()||agent.machineName.trim();
+ const safe=preferred.replace(/[<>:"/\\|?*\u0000-\u001f]/g,"-").replace(/[. ]+$/g,"").trim();
+ return safe||agent.agentId;
+}
+
+function agentRepositoryRoot(baseRoot:string,agent?:Agent){
+ const root=baseRoot.trim().replace(/[\\/]+$/g,"");
+ return root&&agent?`${root}\\${safeBackupFolderName(agent)}`:root;
+}
+
 type CommandEnvelope={commandId:string;completed:boolean;succeeded:boolean;resultJson?:string|null;error?:string|null;attemptCount:number;leaseExpiresAtUtc?:string|null};
 type EnqueueResponse={commandId:string};
 async function pollCommandResult<T>(commandId:string,timeoutMs=60000):Promise<T>{
@@ -114,7 +125,7 @@ export function Console({user,onLogout}:{user:SessionUser;onLogout:()=>void}){
     {page==="reliability"&&<ReliabilityPage/>}
     {page==="autonomous"&&<AutonomousReliabilityPage/>}
     {page==="ha"&&<HaDrPage/>}
-    {page==="agents"&&<AgentsPage agents={filteredAgents}/>}
+    {page==="agents"&&<AgentsPage agents={filteredAgents} onAgentUpdated={updated=>setAgents(current=>current.map(agent=>agent.agentId===updated.agentId?updated:agent))}/>}
     {page==="operations"&&<OperationsPage agents={agents}/>}
     {page==="lifecycle"&&<LifecyclePage agents={agents}/>}
     {page==="validation"&&<ValidationPage/>}
@@ -124,8 +135,8 @@ export function Console({user,onLogout}:{user:SessionUser;onLogout:()=>void}){
     {page==="users"&&<UsersPage/>}
     {page==="security"&&<SecurityPage agents={agents}/>}
     {page==="audit"&&<AuditPage/>}
-    {page==="policies"&&<PoliciesPage policies={policies} agents={agents}/>}
-    {page==="storage"&&<StoragePage nas={nas}/>}
+    {page==="policies"&&<PoliciesPage policies={policies} agents={agents} nas={nas}/>}
+    {page==="storage"&&<StoragePage nas={nas} onNasUpdated={setNas}/>}
     {page==="restore"&&<RestorePage/>}
     {page==="settings"&&<SettingsPage/>}
     </>}
@@ -644,15 +655,15 @@ function DashboardPage({dashboard:d,health:h,agents,policies}:{dashboard:Dashboa
  <div className="mt-6 grid gap-6 xl:grid-cols-2"><Card><CardHeader><div><CardTitle>Filo erişilebilirliği</CardTitle><CardDescription>Son üç dakikadaki Agent heartbeat verisine göre.</CardDescription></div><Badge tone={onlinePct>=90?"success":"warning"}>{onlinePct}% online</Badge></CardHeader><CardContent><Progress value={onlinePct}/><div className="mt-4 grid grid-cols-3 gap-3 text-xs"><span className="rounded-xl bg-slate-50 p-3 text-slate-500">Toplam <b className="block pt-1 text-lg text-slate-900">{agents.length}</b></span><span className="rounded-xl bg-emerald-50 p-3 text-emerald-700">Online <b className="block pt-1 text-lg">{d?.onlineAgents??0}</b></span><span className="rounded-xl bg-slate-50 p-3 text-slate-500">Offline <b className="block pt-1 text-lg text-slate-900">{d?.offlineAgents??0}</b></span></div></CardContent></Card><Card><CardHeader><div><CardTitle>Politika kapsamı</CardTitle><CardDescription>Tanımlı yedekleme politikalarının durumu.</CardDescription></div></CardHeader><CardContent><div className="space-y-3">{policies.slice(0,5).map(p=><div key={p.policyId} className="flex items-center justify-between rounded-xl border border-slate-100 p-3"><div className="min-w-0"><b className="block truncate text-xs text-slate-800">{p.name}</b><small className="block truncate text-[10px] text-slate-400">{p.sourcePath}</small></div><Badge tone={p.enabled?"success":"neutral"}>{p.enabled?"Aktif":"Pasif"}</Badge></div>)}{policies.length===0&&<p className="text-sm text-slate-400">Henüz politika bulunmuyor.</p>}</div></CardContent></Card></div></>
 }
 
-function AgentsPage({agents}:{agents:Agent[]}){
+function AgentsPage({agents,onAgentUpdated}:{agents:Agent[];onAgentUpdated:(agent:Agent)=>void}){
  const [rows,setRows]=useState<Agent[]>(agents),[owners,setOwners]=useState<Record<string,string>>({}),[busy,setBusy]=useState(""),[status,setStatus]=useState("");
  useEffect(()=>{setRows(agents);setOwners(Object.fromEntries(agents.map(a=>[a.agentId,a.assignedUser||""])))},[agents]);
  const now=Date.now();
- async function saveOwner(a:Agent){setBusy(a.agentId);try{const r=await api<{agentId:string;assignedUser?:string|null}>("/api/v1/admin/agents/"+a.agentId+"/assigned-user",{method:"POST",body:JSON.stringify({assignedUser:owners[a.agentId]?.trim()||null})});setRows(x=>x.map(v=>v.agentId===a.agentId?{...v,assignedUser:r.assignedUser}:v));setStatus(a.machineName+" kullanıcı/sahip bilgisi kaydedildi.")}catch(e){setStatus(e instanceof Error?e.message:"Sahip kaydedilemedi.")}finally{setBusy("")}}
+ async function saveOwner(a:Agent){setBusy(a.agentId);try{const r=await api<{agentId:string;assignedUser?:string|null}>("/api/v1/admin/agents/"+a.agentId+"/assigned-user",{method:"PUT",body:JSON.stringify({assignedUser:owners[a.agentId]?.trim()||null})});const updated={...a,assignedUser:r.assignedUser};setRows(x=>x.map(v=>v.agentId===a.agentId?updated:v));onAgentUpdated(updated);setStatus((r.assignedUser||a.machineName)+" adı kaydedildi ve tüm yedekleme ekranlarına uygulandı.")}catch(e){setStatus(e instanceof Error?e.message:"Bilgisayar adı kaydedilemedi.")}finally{setBusy("")}}
  return <><PageHero eyebrow="Fleet" title="Bilgisayarlar" desc="Korunan uç noktaları izleyin ve Kullanıcı / Sahibi bilgisini doğrudan React cihaz kartından yönetin." icon={Computer}/>{status&&<div className="mb-5 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">{status}</div>}<div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rows.map(a=>{const online=a.lastSeenUtc?now-new Date(a.lastSeenUtc).getTime()<180000:false;const locked=a.protectionStatus?.toLowerCase()==="locked";return <Card key={a.agentId} className="overflow-hidden transition hover:-translate-y-0.5"><div className={cn("h-1.5",locked?"bg-rose-500":online?"bg-emerald-500":"bg-slate-300")}/><CardHeader><div className="flex min-w-0 items-center gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-900 text-white shadow-md"><Computer size={21}/></div><div className="min-w-0"><CardTitle className="truncate">{a.machineName}</CardTitle><CardDescription className="truncate">{a.operatingSystem||"İşletim sistemi bilinmiyor"}</CardDescription></div></div><Badge tone={locked?"danger":online?"success":"neutral"}>{locked?"Kilitli":online?"Çevrimiçi":"Çevrimdışı"}</Badge></CardHeader><CardContent><div className="grid grid-cols-2 gap-3 text-xs"><div className="rounded-xl bg-slate-50 p-3"><span className="text-slate-400">Agent</span><b className="mt-1 block truncate text-slate-700">{a.agentVersion||"—"}</b></div><div className="rounded-xl bg-slate-50 p-3"><span className="text-slate-400">Son bağlantı</span><b className="mt-1 block text-slate-700">{fmtDate(a.lastSeenUtc)}</b></div></div><div className="mt-4"><label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Kullanıcı / Sahibi</label><div className="mt-2 flex gap-2"><Input value={owners[a.agentId]??""} onChange={e=>setOwners(x=>({...x,[a.agentId]:e.target.value}))} placeholder="Ad Soyad / Departman"/><Button size="sm" onClick={()=>void saveOwner(a)} disabled={busy===a.agentId}>Kaydet</Button></div></div></CardContent></Card>})}{rows.length===0&&<Card className="p-8 text-center text-sm text-slate-400">Aramayla eşleşen bilgisayar yok.</Card>}</div></>
 }
 
-function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
+function PoliciesPage({policies,agents,nas}:{policies:Policy[];agents:Agent[];nas:NasProfile|null}){
  const [rows,setRows]=useState<Policy[]>(policies),[open,setOpen]=useState(false),[status,setStatus]=useState(""),[busy,setBusy]=useState("");
  type BrowseEntry={name:string;fullPath:string;isDirectory:boolean;length?:number|null;lastWriteTimeUtc?:string};
  type BrowseResult={path:string;entries:BrowseEntry[]};
@@ -660,6 +671,7 @@ function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
  const [browserOpen,setBrowserOpen]=useState(false),[browsePath,setBrowsePath]=useState("::drives"),[browseEntries,setBrowseEntries]=useState<BrowseEntry[]>([]);
  useEffect(()=>setRows(policies),[policies]);
  useEffect(()=>{if(!agentId&&agents[0])setAgentId(agents[0].agentId)},[agents,agentId]);
+ useEffect(()=>{const agent=agents.find(a=>a.agentId===agentId);if(nas&&agent){setRepositoryRoot(agentRepositoryRoot(nas.repositoryRoot,agent));setRepositoryId(nas.repositoryId);if(!name)setName(`${agent.assignedUser?.trim()||agent.machineName} Yedekleme`)}},[nas,agents,agentId]);
  const names=new Map(agents.map(a=>[a.agentId,agentDisplayName(a)]));
  async function refresh(){setRows(await api<Policy[]>("/api/v1/admin/policies"))}
  async function browse(path:string){
@@ -691,14 +703,15 @@ function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
  <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div className="text-xs text-slate-500">{rows.length} politika · {rows.filter(p=>p.enabled).length} aktif</div><Button onClick={()=>setOpen(!open)}><ShieldCheck size={16}/>{open?"Formu Kapat":"Yeni Politika"}</Button></div>
  {open&&<Card className="mb-6"><CardHeader><div><CardTitle>Yeni Yedekleme Politikası</CardTitle><CardDescription>Mevcut backend doğrulamalarını kullanan production form.</CardDescription></div></CardHeader><CardContent className="grid gap-4 lg:grid-cols-2">
   <Input value={name} onChange={e=>setName(e.target.value)} placeholder="Politika adı"/>
-  <select value={agentId} onChange={e=>{setAgentId(e.target.value);setSourcePaths([]);setBrowserOpen(false)}} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">{agents.map(a=><option key={a.agentId} value={a.agentId}>{agentDisplayName(a)}</option>)}</select>
+  <select value={agentId} onChange={e=>{setAgentId(e.target.value);setName("");setSourcePaths([]);setBrowserOpen(false)}} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">{agents.map(a=><option key={a.agentId} value={a.agentId}>{agentDisplayName(a)}</option>)}</select>
   <div className="rounded-xl border border-slate-200 p-3 lg:col-span-2">
    <div className="flex flex-wrap items-center justify-between gap-2"><div><b className="block text-xs text-slate-700">Kaynak klasörler</b><small className="text-[10px] text-slate-400">Yol yazmadan Agent üzerindeki bir veya daha fazla klasörü seçin.</small></div><Button type="button" variant="outline" onClick={()=>void browse(browserOpen?browsePath:"::drives")} disabled={busy==="browse"}>{busy==="browse"?"Klasörler okunuyor...":"Klasör Seç"}</Button></div>
    {sourcePaths.length>0&&<div className="mt-3 flex flex-wrap gap-2">{sourcePaths.map(path=><span key={path} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700"><span className="truncate">{path}</span><button type="button" aria-label={path+" seçimini kaldır"} onClick={()=>toggleSource(path)}><X size={13}/></button></span>)}</div>}
    {browserOpen&&<div className="mt-3 overflow-hidden rounded-xl border border-slate-200"><div className="flex items-center gap-2 border-b bg-slate-50 p-2"><Button type="button" size="sm" variant="ghost" disabled={browsePath==="::drives"||busy==="browse"} onClick={()=>void browse(parentPath(browsePath))}>Üst Klasör</Button><span className="min-w-0 flex-1 truncate text-xs text-slate-500">{browsePath==="::drives"?"Sürücüler":browsePath}</span>{browsePath!=="::drives"&&<Button type="button" size="sm" onClick={()=>toggleSource(browsePath)}>{sourcePaths.some(x=>x.toLocaleLowerCase()===browsePath.toLocaleLowerCase())?"Seçimi Kaldır":"Bu Klasörü Seç"}</Button>}</div><div className="max-h-72 overflow-auto">{browseEntries.map(entry=><div key={entry.fullPath} className="flex items-center gap-2 border-b border-slate-100 p-2 last:border-0"><input type="checkbox" aria-label={entry.name+" klasörünü seç"} checked={sourcePaths.some(x=>x.toLocaleLowerCase()===entry.fullPath.toLocaleLowerCase())} onChange={()=>toggleSource(entry.fullPath)}/><button type="button" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-xs hover:bg-slate-50" onClick={()=>void browse(entry.fullPath)}><HardDrive size={15} className="shrink-0 text-slate-400"/><span className="truncate">{entry.name}</span><ChevronRight size={14} className="ml-auto shrink-0 text-slate-300"/></button></div>)}{browseEntries.length===0&&<div className="p-6 text-center text-xs text-slate-400">Alt klasör bulunamadı. Bu klasörü seçebilirsiniz.</div>}</div></div>}
   </div>
-  <Input value={repositoryRoot} onChange={e=>setRepositoryRoot(e.target.value)} placeholder="Repository root, örn. \\NAS\PC_Yedek"/>
-  <Input value={repositoryId} onChange={e=>setRepositoryId(e.target.value)} placeholder="Repository ID"/>
+  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Otomatik yedekleme hedefi</span><Input value={repositoryRoot} readOnly placeholder="Önce Depolama & NAS ayarını kaydedin"/><small className="mt-1 block text-[11px] text-slate-400">NAS ana yolu ve verilen bilgisayar/kullanıcı adına göre otomatik oluşturulur.</small></label>
+  <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Depo kimliği</span><Input value={repositoryId} readOnly placeholder="NAS ayarından otomatik gelir"/></label>
+  {!nas&&<div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Yedekleme oluşturmadan önce Depolama & NAS ekranında NAS bağlantısını kaydedip test edin.</div>}
   <Input type="number" min={5} value={intervalMinutes} onChange={e=>setIntervalMinutes(Number(e.target.value))} placeholder="Dakika"/>
   <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-600"><input type="checkbox" checked={requireSnapshot} onChange={e=>setRequireSnapshot(e.target.checked)}/>VSS snapshot zorunlu</label>
   <div className="lg:col-span-2"><Button onClick={()=>void createPolicy()} disabled={busy==="create"}>Politikayı Oluştur</Button></div>
@@ -707,7 +720,7 @@ function PoliciesPage({policies,agents}:{policies:Policy[];agents:Agent[]}){
  <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400"><tr><th className="p-4">Politika</th><th className="p-4">Bilgisayar</th><th className="p-4">Kaynak</th><th className="p-4">Repository</th><th className="p-4">Sıklık</th><th className="p-4">Sıradaki</th><th className="p-4">Durum</th><th className="p-4">İşlem</th></tr></thead><tbody>{rows.map(p=><tr key={p.policyId} className="border-t border-slate-100 hover:bg-slate-50/60"><td className="p-4 font-bold text-slate-800">{p.name}</td><td className="p-4 text-slate-600">{names.get(p.agentId)||p.agentId}</td><td className="max-w-xs truncate p-4 text-slate-500">{p.sourcePath}</td><td className="p-4 text-slate-600">{p.repositoryId}</td><td className="p-4 text-slate-500">{p.intervalMinutes} dk</td><td className="p-4 text-slate-500">{fmtDate(p.nextRunAtUtc)}</td><td className="p-4"><Badge tone={p.enabled?"success":"neutral"}>{p.enabled?"Aktif":"Pasif"}</Badge></td><td className="p-4"><div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy===p.policyId} onClick={()=>void toggle(p)}>{p.enabled?"Pasif Yap":"Aktif Yap"}</Button><Button size="sm" variant="danger" disabled={busy===p.policyId} onClick={()=>void remove(p)}>Sil</Button></div></td></tr>)}</tbody></table></div>{rows.length===0&&<div className="p-8 text-center text-sm text-slate-400">Henüz politika yok.</div>}</Card></>
 }
 
-function StoragePage({nas}:{nas:NasProfile|null}){
+function StoragePage({nas,onNasUpdated}:{nas:NasProfile|null;onNasUpdated:(profile:NasProfile)=>void}){
  type NasTestResult={succeeded:boolean;repositoryId:string;repositoryRoot:string;credentialConfigured:boolean;directoryReadable:boolean;writeProbeSucceeded:boolean;message:string};
  const [profile,setProfile]=useState<NasProfile|null>(nas),[repositoryId,setRepositoryId]=useState(nas?.repositoryId??""),[repositoryRoot,setRepositoryRoot]=useState(nas?.repositoryRoot??""),[username,setUsername]=useState(nas?.username??""),[password,setPassword]=useState(""),[status,setStatus]=useState(""),[busy,setBusy]=useState("");
  const [agents,setAgents]=useState<Agent[]>([]),[testAgentId,setTestAgentId]=useState(""),[testResult,setTestResult]=useState<NasTestResult|null>(null);
@@ -726,7 +739,7 @@ function StoragePage({nas}:{nas:NasProfile|null}){
  async function persistGlobal(){
   if(!validate())return null;
   const r=await api<{profile:NasProfile;queuedAgents:number;skippedAgents:number;passwordReused:boolean}>("/api/v1/admin/nas/global-profile",{method:"POST",body:JSON.stringify({repositoryId:normalizedId,repositoryRoot:repositoryRoot.trim(),username:username.trim(),password:password||null})});
-  setRepositoryId(normalizedId);setPassword("");setProfile(r.profile);
+  setRepositoryId(normalizedId);setPassword("");setProfile(r.profile);onNasUpdated(r.profile);
   return r
  }
  async function saveGlobal(){

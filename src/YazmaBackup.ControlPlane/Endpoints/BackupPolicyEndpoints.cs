@@ -102,7 +102,7 @@ internal static class BackupPolicyEndpoints
             catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
-        groups.Backup.MapPost("/policies/multi-source", async (CreateMultiSourceBackupPolicyRequest request, IControlPlaneStore store, CancellationToken ct) =>
+        groups.Backup.MapPost("/policies/multi-source", async (CreateMultiSourceBackupPolicyRequest request, IControlPlaneStore store, GlobalNasProfileStore nasProfiles, CancellationToken ct) =>
         {
             var retention = request.Retention ?? new RetentionPolicy();
             var protection = request.Protection ?? new ProtectionPolicy();
@@ -112,13 +112,18 @@ internal static class BackupPolicyEndpoints
                 return Results.BadRequest(new { error = "SourcePaths must contain 1..100 unique valid paths." });
             if (!ValidText(request.Name, 110) || request.IntervalMinutes is < 5 or > 43200 || request.RestoreDrillIntervalDays is < 1 or > 365 || request.RepositoryHealthIntervalHours is < 1 or > 720)
                 return Results.BadRequest(new { error = "Policy name, backup interval or restore drill interval is invalid." });
-            if (!ValidBackupRequest(request.SourcePaths[0], request.RepositoryRoot, request.RepositoryId, request.ActiveBytesPerSecond, request.IdleBytesPerSecond, request.UserIdleThresholdSeconds, retention, protection, out var error))
+            var nas = await nasProfiles.GetAsync(ct).ConfigureAwait(false);
+            if (nas is null) return Results.BadRequest(new { error = "Önce Depolama & NAS ekranından global NAS ayarını kaydedin." });
+            var agent = (await store.GetAgentsAsync(ct).ConfigureAwait(false)).FirstOrDefault(item => item.AgentId == request.AgentId);
+            if (agent is null) return Results.NotFound(new { error = "Bilgisayar bulunamadı." });
+            var repositoryRoot = BuildAgentRepositoryRoot(nas.RepositoryRoot, agent.AssignedUser, agent.MachineName, agent.AgentId);
+            if (!ValidBackupRequest(request.SourcePaths[0], repositoryRoot, nas.RepositoryId, request.ActiveBytesPerSecond, request.IdleBytesPerSecond, request.UserIdleThresholdSeconds, retention, protection, out var error))
                 return Results.BadRequest(new { error });
 
             var now = DateTimeOffset.UtcNow;
             var policies = request.SourcePaths.Select((sourcePath, index) => new BackupPolicyRecord(
                 Guid.NewGuid(), request.SourcePaths.Count == 1 ? request.Name.Trim() : $"{request.Name.Trim()} · {index + 1}", request.AgentId, sourcePath,
-                request.RepositoryRoot, request.RepositoryId, request.RequireSnapshot, request.IntervalMinutes, request.ActiveBytesPerSecond,
+                repositoryRoot, nas.RepositoryId, request.RequireSnapshot, request.IntervalMinutes, request.ActiveBytesPerSecond,
                 request.IdleBytesPerSecond, request.UserIdleThresholdSeconds, retention, request.Enabled, now, null, now, protection,
                 request.RestoreDrillIntervalDays, null, now.AddDays(request.RestoreDrillIntervalDays), request.RepositoryHealthIntervalHours, null, now)).ToArray();
             try
@@ -149,5 +154,14 @@ internal static class BackupPolicyEndpoints
         });
 
         return groups;
+    }
+
+    private static string BuildAgentRepositoryRoot(string baseRoot, string? assignedUser, string machineName, Guid agentId)
+    {
+        var preferred = string.IsNullOrWhiteSpace(assignedUser) ? machineName.Trim() : assignedUser.Trim();
+        var invalid = new HashSet<char>(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
+        var safe = new string(preferred.Select(character => character < 32 || invalid.Contains(character) ? '-' : character).ToArray()).Trim().TrimEnd('.');
+        if (string.IsNullOrWhiteSpace(safe)) safe = agentId.ToString("N");
+        return baseRoot.TrimEnd('\\', '/') + "\\" + safe;
     }
 }
