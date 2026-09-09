@@ -44,4 +44,8 @@ for(const invariant of ["/api/v1/admin/agents/","/browse","pollCommandResult<Bro
     process.exit(1);
   }
 }
+if(!source.includes("type EnqueueResponse={commandId:string}") || source.includes("api<Enqueue>")){
+  console.error("Agent komut yanıt tipi ortak kapsamda değil veya eski kapsam-dışı Enqueue kullanımı kaldı.");
+  process.exit(1);
+}
 console.log("PASS: Merkezi Türkçe arayüz sözlüğü ve enterprise modül dil kapısı.");

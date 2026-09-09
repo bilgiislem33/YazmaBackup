@@ -18,3 +18,7 @@ Politika formundaki doğrudan kaynak yol girişi kaldırıldı. Yönetici, seçi
 - Merkezi Türkçe arayüz ve çoklu seçim invariant kontrolü
 - ControlPlane route snapshot: `POST /api/v1/admin/policies/multi-source`
 - CI üzerinde .NET testleri, TypeScript typecheck ve production frontend build
+
+## R29.3.2 derleme düzeltmesi
+
+İlk R29.3.1 paketinde politika ekranı, geri yükleme bileşeninin yerel kapsamındaki `Enqueue` tipine başvuruyordu. `EnqueueResponse` ortak frontend kapsamına taşındı; klasör gezgini, geri yükleme ve doğrulama işlemleri aynı sözleşmeyi kullanacak şekilde birleştirildi. Statik kalite kapısı eski `api<Enqueue>` kullanımını artık reddeder.

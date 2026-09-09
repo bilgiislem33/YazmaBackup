@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.3.1 multi-source picker: browses the selected Agent's real drives and folders, supports checkbox-based multiple source selection, and creates all source policies atomically.",
-  "releaseRevision": "r29.3.1-multi-source-picker"
+  "notes": "R29.3.2 multi-source build repair: promotes the Agent enqueue response contract to shared frontend scope and locks the folder picker against out-of-scope TypeScript types.",
+  "releaseRevision": "r29.3.2-multi-source-build-repair"
 }
