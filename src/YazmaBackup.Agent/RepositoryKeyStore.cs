@@ -12,8 +12,12 @@ public sealed class RepositoryKeyStore
     private readonly MachineSecretStore _secretStore = new();
 
     public RepositoryCryptoContext OpenCryptoContext(string repositoryId)
+        => OpenCryptoContext(repositoryId, out _);
+
+    public RepositoryCryptoContext OpenCryptoContext(string repositoryId, out string canonicalRepositoryId)
     {
         var document = ReadDocument(repositoryId) ?? throw new InvalidOperationException($"Repository key ring is not provisioned: {repositoryId}.");
+        canonicalRepositoryId = document.RepositoryId;
         var keys = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         try
         {
@@ -68,7 +72,7 @@ public sealed class RepositoryKeyStore
             }
 
             var activeKeyId = existing is null || makeActive ? keyId : existing.ActiveKeyId;
-            var document = new RepositoryKeyRingDocument(repositoryId, activeKeyId, keys.OrderBy(k => k.CreatedAtUtc).ToArray());
+            var document = new RepositoryKeyRingDocument(existing?.RepositoryId ?? repositoryId, activeKeyId, keys.OrderBy(k => k.CreatedAtUtc).ToArray());
             WriteDocument(repositoryId, document);
         }
         finally
@@ -88,8 +92,8 @@ public sealed class RepositoryKeyStore
     public async Task RemoveAfterRepositoryValidationAsync(string repositoryRoot, string repositoryId, string keyId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
-        using var crypto = OpenCryptoContext(repositoryId);
-        var repository = new FileSystemBackupRepository(repositoryRoot, repositoryId, crypto);
+        using var crypto = OpenCryptoContext(repositoryId, out var canonicalRepositoryId);
+        var repository = new FileSystemBackupRepository(repositoryRoot, canonicalRepositoryId, crypto);
         var referencedKeys = await repository.GetReferencedEncryptionKeyIdsAsync(cancellationToken).ConfigureAwait(false);
         if (referencedKeys.Contains(keyId))
             throw new InvalidOperationException($"Repository still references key {keyId}. Complete scrub/rekey before retiring it.");
@@ -119,7 +123,7 @@ public sealed class RepositoryKeyStore
         if (string.IsNullOrWhiteSpace(value)) return null;
         var document = JsonSerializer.Deserialize<RepositoryKeyRingDocument>(value, JsonOptions)
             ?? throw new InvalidDataException("Repository key ring could not be deserialized.");
-        if (!string.Equals(document.RepositoryId, repositoryId, StringComparison.Ordinal))
+        if (!string.Equals(document.RepositoryId, repositoryId, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Repository key ring identifier mismatch.");
         if (document.Keys.Length == 0 || !document.Keys.Any(k => string.Equals(k.KeyId, document.ActiveKeyId, StringComparison.Ordinal)))
             throw new InvalidDataException("Repository key ring has no valid active key.");

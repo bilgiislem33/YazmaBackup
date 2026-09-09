@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.8 backup execution diagnostics: keeps queued commands pending until Agent completion, refreshes history automatically, surfaces the exact Agent failure and shows the effective per-owner NAS target.",
-  "releaseRevision": "r29.8-backup-execution-diagnostics"
+  "notes": "R29.9 repository identity recovery: treats Windows repository identifiers case-insensitively, preserves the original canonical identity for encrypted metadata, and uses key-material fingerprints for collision-free safe key rotation.",
+  "releaseRevision": "r29.9-repository-identity-recovery"
 }

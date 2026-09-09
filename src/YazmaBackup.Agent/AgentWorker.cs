@@ -382,8 +382,8 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "GranularRestore")
         {
             var payload = JsonSerializer.Deserialize<GranularRestorePayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid granular-restore payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var restore = new RestoreEngine(repository);
             var summary = await restore.RestoreSelectedAsync(identity.AgentId.ToString("D"), payload.BackupId, payload.DestinationRoot, payload.IncludePaths, payload.OverwriteExisting, cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Serialize(new RestoreResultDto(payload.BackupId, summary.RestoredFiles + summary.AlreadyPresentFiles, summary.RestoredBytes, Path.GetFullPath(payload.DestinationRoot)), CommandResultJsonOptions);
@@ -395,8 +395,8 @@ public sealed class AgentWorker : IDisposable
             var baseRoot = Path.GetFullPath(payload.SandboxRoot);
             Directory.CreateDirectory(baseRoot);
             var runRoot = Path.Combine(baseRoot, $"yb-sandbox-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var restore = new RestoreEngine(repository);
             var summary = await restore.RestoreSandboxAsync(identity.AgentId.ToString("D"), payload.BackupId, runRoot, payload.MaxFiles, payload.MaxBytes, cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Serialize(new RestoreSandboxResultDto(payload.BackupId, runRoot, summary.RestoredFiles + summary.AlreadyPresentFiles, summary.RestoredBytes, "verified", DateTimeOffset.UtcNow), CommandResultJsonOptions);
@@ -424,14 +424,14 @@ public sealed class AgentWorker : IDisposable
             if (activeLock is not null)
                 throw new InvalidOperationException($"Backup protection is locked by incident {activeLock.IncidentId:D}. Clear the incident before starting a new backup.");
             EnsureRepositoryOutsideSource(payload.Path, payload.RepositoryRoot);
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
             var idleThreshold = TimeSpan.FromSeconds(payload.UserIdleThresholdSeconds);
             var transferTracker = new TransferActivityTracker();
             var backupProgress = new BackupProgressTracker();
             using var rateLimiter = new TokenBucketThroughputLimiter(() =>
                 WindowsSessionActivityProbe.IsUserActive(idleThreshold) ? payload.ActiveBytesPerSecond : payload.IdleBytesPerSecond);
             var repository = new FileSystemBackupRepository(
-                payload.RepositoryRoot, payload.RepositoryId, crypto, rateLimiter,
+                payload.RepositoryRoot, canonicalRepositoryId, crypto, rateLimiter,
                 transferObserver: transferTracker);
             ISnapshotProvider snapshotProvider;
             if (!payload.RequireSnapshot)
@@ -494,8 +494,8 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "ListRestorePoints")
         {
             var payload = JsonSerializer.Deserialize<ListRestorePointsPayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid restore-point list payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var points = (await repository.ListManifestsAsync(identity.AgentId.ToString("D"), payload.SourceRoot, cancellationToken).ConfigureAwait(false))
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Take(500)
@@ -507,8 +507,8 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "ListRestoreEntries")
         {
             var payload = JsonSerializer.Deserialize<ListRestoreEntriesPayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid restore-entry list payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var manifest = await repository.ReadManifestAsync(identity.AgentId.ToString("D"), payload.BackupId, cancellationToken).ConfigureAwait(false);
             var prefix = NormalizeRestorePrefix(payload.Prefix);
             var entries = BuildRestoreEntries(manifest, prefix);
@@ -518,8 +518,8 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "RestoreBackup")
         {
             var payload = JsonSerializer.Deserialize<RestorePayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid restore payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var restore = new RestoreEngine(repository);
             var summary = await restore.RestoreAsync(identity.AgentId.ToString("D"), payload.BackupId, payload.DestinationRoot, payload.OverwriteExisting, cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Serialize(new RestoreResultDto(payload.BackupId, summary.RestoredFiles + summary.AlreadyPresentFiles, summary.RestoredBytes, Path.GetFullPath(payload.DestinationRoot)), CommandResultJsonOptions);
@@ -528,8 +528,8 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "RestorePointInTime")
         {
             var payload = JsonSerializer.Deserialize<RestorePointInTimePayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid point-in-time restore payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var restorePoint = (await repository.ListManifestsAsync(identity.AgentId.ToString("D"), payload.SourceRoot, cancellationToken).ConfigureAwait(false))
                 .Where(m => m.CreatedAtUtc <= payload.RestorePointUtc)
                 .OrderByDescending(m => m.CreatedAtUtc)
@@ -543,10 +543,10 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "ScrubRepository")
         {
             var payload = JsonSerializer.Deserialize<ScrubRepositoryPayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid repository scrub payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
             var repository = new FileSystemBackupRepository(
                 payload.RepositoryRoot,
-                payload.RepositoryId,
+                canonicalRepositoryId,
                 crypto,
                 limiter: null,
                 allowLegacyInitialization: payload.MigrateLegacyPlaintext);
@@ -557,8 +557,8 @@ public sealed class AgentWorker : IDisposable
         if (command.Type == "RestoreDrill")
         {
             var payload = JsonSerializer.Deserialize<RestoreDrillPayload>(command.PayloadJson) ?? throw new InvalidDataException("Invalid restore drill payload.");
-            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId);
-            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, payload.RepositoryId, crypto);
+            using var crypto = _repositoryKeys.OpenCryptoContext(payload.RepositoryId, out var canonicalRepositoryId);
+            var repository = new FileSystemBackupRepository(payload.RepositoryRoot, canonicalRepositoryId, crypto);
             var latest = (await repository.ListManifestsAsync(identity.AgentId.ToString("D"), payload.SourceRoot, cancellationToken).ConfigureAwait(false))
                 .OrderByDescending(m => m.CreatedAtUtc)
                 .FirstOrDefault()

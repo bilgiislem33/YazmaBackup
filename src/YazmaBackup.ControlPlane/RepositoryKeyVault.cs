@@ -38,7 +38,7 @@ public sealed class RepositoryKeyVault
                         CryptographicOperations.ZeroMemory(clear);
                         throw new InvalidDataException($"Protected repository key has invalid length: {repositoryId}.");
                     }
-                    return new RepositoryVaultKey("auto-v1", clear);
+                    return new RepositoryVaultKey(BuildKeyId(clear), clear);
                 }
                 finally
                 {
@@ -53,7 +53,7 @@ public sealed class RepositoryKeyVault
                 var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 File.WriteAllBytes(temp, protectedKey);
                 File.Move(temp, path, overwrite: false);
-                return new RepositoryVaultKey("auto-v1", key);
+                return new RepositoryVaultKey(BuildKeyId(key), key);
             }
             catch
             {
@@ -65,6 +65,13 @@ public sealed class RepositoryKeyVault
                 CryptographicOperations.ZeroMemory(protectedKey);
             }
         }
+    }
+
+    internal static string BuildKeyId(ReadOnlySpan<byte> keyMaterial)
+    {
+        Span<byte> fingerprint = stackalloc byte[32];
+        SHA256.HashData(keyMaterial, fingerprint);
+        return "auto-" + Convert.ToHexString(fingerprint[..8]).ToLowerInvariant();
     }
 
     private string GetPath(string repositoryId)
