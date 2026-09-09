@@ -82,7 +82,9 @@ internal static class FleetMonitoringEndpoints
                     }
                     return new
                     {
-                        c.CommandId, c.AgentId, c.CreatedAtUtc, c.CompletedAtUtc, c.Succeeded, c.Error,
+                        c.CommandId, c.AgentId, c.CreatedAtUtc, c.CompletedAtUtc,
+                        succeeded = c.CompletedAtUtc is null ? (bool?)null : c.Succeeded,
+                        error = c.CompletedAtUtc is null ? null : c.Error,
                         errorCategory = ClassifyBackupError(c.Error),
                         sourcePath = request?.Path,
                         repositoryRoot = request?.RepositoryRoot,

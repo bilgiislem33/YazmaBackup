@@ -7,6 +7,6 @@
   "productionReady": false,
   "stateSchema": 11,
   "repositorySchema": 3,
-  "notes": "R29.7 identity-aware backup targeting: fixes assigned-name persistence, propagates it immediately across workflows, inherits the global NAS profile in policy creation, and enforces a safe per-owner repository folder server-side.",
-  "releaseRevision": "r29.7-identity-aware-backup-targeting"
+  "notes": "R29.8 backup execution diagnostics: keeps queued commands pending until Agent completion, refreshes history automatically, surfaces the exact Agent failure and shows the effective per-owner NAS target.",
+  "releaseRevision": "r29.8-backup-execution-diagnostics"
 }
