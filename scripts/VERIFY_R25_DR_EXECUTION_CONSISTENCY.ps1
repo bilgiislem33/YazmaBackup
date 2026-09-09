@@ -15,7 +15,7 @@ foreach($x in @('DisasterRecoverySessions','ApproveDisasterRecoveryStepAsync','V
 foreach($x in @('/dr-sessions','/approve','/verify','IDisasterRecoverySessionStore')){
  if(-not $program.Contains($x)){throw ('R25 DR API invariant eksik: '+$x)}
 }
-foreach($x in @('Disaster Recovery War Room','Dependency Recovery Rail','/api/v1/admin/dr-sessions','Bu Adımı Onayla','Doğrula ve Sonraki Gate','sessizce destructive restore çalıştırmaz')){
+foreach($x in @('uiText.disasterRecovery.title','uiText.disasterRecovery.rail','/api/v1/admin/dr-sessions','Bu Adımı Onayla','Doğrula ve Sonraki Gate','kendiliğinden veri değiştiren geri yükleme işlemi çalıştırmaz')){
  if(-not $ui.Contains($x)){throw ('R25 React DR execution UI invariant eksik: '+$x)}
 }
 Write-Host 'PASS: R25 DR Execution + exact PostgreSQL completion lease fencing kalite kapısı.'

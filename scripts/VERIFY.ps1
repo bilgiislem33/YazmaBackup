@@ -376,7 +376,7 @@ try {
     Write-Host '[12av/23] R27 Frontend Experience invariantları'
     & (Join-Path $root 'scripts\VERIFY_R27_FRONTEND_EXPERIENCE.ps1')
 
-    Write-Host '[12aw/23] R27.1 Fleet Galaxy + Device 360 invariantları'
+    Write-Host '[12aw/23] R27.1 Filo Görünümü + Cihaz 360 invariantları'
     & (Join-Path $root 'scripts\VERIFY_R27_1_FLEET_GALAXY.ps1')
 
     Write-Host '[12ax/23] R27.2 Recovery Experience + DR War Room invariantları'

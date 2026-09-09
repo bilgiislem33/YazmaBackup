@@ -34,12 +34,12 @@ foreach($token in @(
 }
 
 foreach($token in @(
-  'Autonomous Remediation & Canary Controller',
-  'Remediation State Machine',
-  'Failure Classification Queue',
-  'Preflight + Canary Başlat',
-  'Health Gate Sonrası Resume',
-  'Rollback Semantiği'
+  'Otonom Düzeltme ve Pilot Dağıtım Denetleyicisi',
+  'uiText.autonomous.stateMachine',
+  'uiText.autonomous.failureQueue',
+  'uiText.autonomous.startCanary',
+  'uiText.autonomous.resumeAfterHealth',
+  'uiText.autonomous.rollbackSemantics'
 )){
   if(-not $console.Contains($token)){throw ('R10.4 UI invariant eksik: '+$token)}
 }

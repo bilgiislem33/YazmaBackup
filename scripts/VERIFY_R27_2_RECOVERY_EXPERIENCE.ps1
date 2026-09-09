@@ -3,7 +3,7 @@
 $root=Split-Path -Parent $PSScriptRoot
 $ui=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\YazmaBackup.Frontend\components\console.tsx')
 $program=Get-YazmaBackupControlPlaneSource -Area Endpoints
-foreach($x in @('RecoveryEvidenceTimeline','Recovery Evidence Timeline','Disaster Recovery War Room','Dependency Recovery Rail','War Room Başlat','Doğrula ve Sonraki Gate')){
+foreach($x in @('RecoveryEvidenceTimeline','Recovery Evidence Timeline','uiText.disasterRecovery.title','uiText.disasterRecovery.rail','uiText.disasterRecovery.start','Doğrula ve Sonraki Gate')){
  if(-not $ui.Contains($x)){throw ('R27.2 frontend invariant eksik: '+$x)}
 }
 foreach($x in @('MapGet("/recovery-plans"','MapGet("/recovery-runs"','MapGet("/dr-sessions"','MapPost("/dr-sessions"','/steps/{order:int}/approve','/steps/{order:int}/verify')){
